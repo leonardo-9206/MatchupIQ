@@ -1,0 +1,47 @@
+# ==========================================
+# MatchupIQ — Git Ignore Configuration
+# ==========================================
+
+# Documentación interna del equipo (No subir a Git)
+Docs nosotros/
+"Docs nosotros/"
+[Dd]ocs [Nn]osotros/
+
+# Archivos temporales de Microsoft Office / Word
+~$*.docx
+~$*.doc
+~$*.pptx
+~$*.xlsx
+
+# Variables de entorno y credenciales (Seguridad estricta)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Dependencias de paquetes
+node_modules/
+vendor/
+
+# Archivos de compilación y empaquetado (Frontend / Vite)
+dist/
+dist-ssr/
+build/
+*.local
+
+# Logs del sistema y errores
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Archivos de caché del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configuraciones locales de IDEs
+.idea/
+*.sublime-project
+*.sublime-workspace
