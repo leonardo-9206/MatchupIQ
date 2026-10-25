@@ -7,17 +7,17 @@ USE `matchupiq_db`;
 
 -- Disable foreign key checks for clean truncation and seeding
 SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE `coverage_splits`;
-TRUNCATE TABLE `player_heatmaps`;
-TRUNCATE TABLE `bet_tracker`;
-TRUNCATE TABLE `props`;
-TRUNCATE TABLE `games`;
-TRUNCATE TABLE `players`;
-TRUNCATE TABLE `teams`;
-TRUNCATE TABLE `sports`;
-TRUNCATE TABLE `bookmakers`;
-TRUNCATE TABLE `users`;
-TRUNCATE TABLE `roles`;
+DELETE FROM `coverage_splits`;
+DELETE FROM `player_heatmaps`;
+DELETE FROM `bet_tracker`;
+DELETE FROM `props`;
+DELETE FROM `games`;
+DELETE FROM `players`;
+DELETE FROM `teams`;
+DELETE FROM `sports`;
+DELETE FROM `bookmakers`;
+DELETE FROM `users`;
+DELETE FROM `roles`;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====================================================
@@ -95,3 +95,4 @@ INSERT INTO `player_heatmaps` (`heatmap_id`, `player_id`, `field_zone`, `attempt
 INSERT INTO `coverage_splits` (`split_id`, `player_id`, `coverage_type`, `targets`, `receptions`, `catch_rate`) VALUES
 (1, 2, 'man', 35, 26, 74.29),
 (2, 2, 'zone', 58, 46, 79.31);
+
