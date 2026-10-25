@@ -83,16 +83,20 @@ INSERT INTO `bet_tracker` (`bet_id`, `user_id`, `prop_id`, `taken_odds`, `stake_
 -- 4. NFL Tactical Heatmaps & Coverage Splits
 -- =====================================================
 
--- Rushing zone breakdown for Isiah Pacheco (player_id = 3)
+-- Rushing zone breakdown for Isiah Pacheco (player_id = 3) and Christian McCaffrey (player_id = 4)
 INSERT INTO `player_heatmaps` (`heatmap_id`, `player_id`, `field_zone`, `attempts`, `yards_gained`, `success_rate`) VALUES
 (1, 3, 'left_end', 24, 132, 58.33),
 (2, 3, 'left_tackle', 42, 215, 64.29),
 (3, 3, 'middle', 68, 310, 52.94),
 (4, 3, 'right_tackle', 38, 198, 60.53),
-(5, 3, 'right_end', 18, 95, 50.00);
+(5, 3, 'right_end', 18, 95, 50.00),
+(6, 4, 'left_end', 31, 204, 61.29),
+(7, 4, 'left_tackle', 36, 171, 55.56),
+(8, 4, 'middle', 52, 228, 50.00),
+(9, 4, 'right_tackle', 47, 266, 63.83),
+(10, 4, 'right_end', 40, 281, 67.50);
 
 -- Coverage performance for Travis Kelce (player_id = 2)
 INSERT INTO `coverage_splits` (`split_id`, `player_id`, `coverage_type`, `targets`, `receptions`, `catch_rate`) VALUES
 (1, 2, 'man', 35, 26, 74.29),
 (2, 2, 'zone', 58, 46, 79.31);
-

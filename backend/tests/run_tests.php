@@ -7,6 +7,7 @@
  * 3. Server-side Input Validation (400 Bad Request, 422 Unprocessable)
  * 4. Secure Authentication Flow (Register 201, Login 200, Duplicate 409, Logout 200)
  * 5. Persistent Props Data Flow (Listing 200, Single Prop 200, 404 Not Found)
+ * 6. NFL Tactical Analytics (Heatmaps & Coverage Splits 200, 400, 404, 405)
  *
  * Usage:
  *   php backend/tests/run_tests.php [baseUrl]
@@ -176,6 +177,44 @@ class TestRunner
 
             $notFound = $this->request('GET', '/api/props/show.php?id=999999');
             $this->assert("GET /api/props/show.php with non-existent id returns 404 Not Found", $notFound['code'] === 404);
+        }
+
+        // ==========================================
+        // Suite 6: NFL Tactical Analytics (Heatmaps & Coverage Splits)
+        // ==========================================
+        $this->section("Suite 6: NFL Tactical Analytics (Heatmaps & Coverage Splits)");
+
+        $missingPlayerHeatmap = $this->request('GET', '/api/tactics/heatmap.php');
+        $this->assert("GET /api/tactics/heatmap.php without player_id returns 400 Bad Request", $missingPlayerHeatmap['code'] === 400);
+
+        $invalidMethodHeatmap = $this->request('POST', '/api/tactics/heatmap.php');
+        $this->assert("POST /api/tactics/heatmap.php is blocked with 405 Method Not Allowed", $invalidMethodHeatmap['code'] === 405);
+
+        $missingPlayerCoverage = $this->request('GET', '/api/tactics/coverage.php');
+        $this->assert("GET /api/tactics/coverage.php without player_id returns 400 Bad Request", $missingPlayerCoverage['code'] === 400);
+
+        $heatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=3');
+        if ($heatmap['code'] === 500 && str_contains(json_encode($heatmap), 'Database connection failed')) {
+            $this->skip("Tactical heatmap & coverage persistence tests skipped: MySQL database is not currently running.");
+        } else {
+            $this->assert("GET /api/tactics/heatmap.php?player_id=3 returns 200 OK", $heatmap['code'] === 200);
+            $zones = $heatmap['json']['data']['zones'] ?? [];
+            $this->assert("Heatmap response contains all 5 offensive rushing zones", is_array($zones) && count($zones) === 5);
+            $this->assert("Heatmap response includes summary metrics and dominant_zone", 
+                isset($heatmap['json']['data']['summary']['dominant_zone'], $heatmap['json']['data']['summary']['overall_success_rate']));
+
+            $notFoundHeatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=999999');
+            $this->assert("GET /api/tactics/heatmap.php?player_id=999999 returns 404 Not Found", $notFoundHeatmap['code'] === 404);
+
+            $coverage = $this->request('GET', '/api/tactics/coverage.php?player_id=2');
+            $this->assert("GET /api/tactics/coverage.php?player_id=2 returns 200 OK", $coverage['code'] === 200);
+            $splits = $coverage['json']['data']['splits'] ?? [];
+            $schemes = is_array($splits) ? array_column($splits, 'coverage_type') : [];
+            $this->assert("Coverage response contains both 'man' and 'zone' splits", 
+                in_array('man', $schemes, true) && in_array('zone', $schemes, true));
+
+            $notFoundCoverage = $this->request('GET', '/api/tactics/coverage.php?player_id=999999');
+            $this->assert("GET /api/tactics/coverage.php?player_id=999999 returns 404 Not Found", $notFoundCoverage['code'] === 404);
         }
 
         // ==========================================
