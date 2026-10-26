@@ -152,7 +152,7 @@ export default function FieldHeatmap({ data, metric = 'attempts' }) {
         <div className="min-h-[88px] w-full rounded-xl border border-slate-800 bg-surface-2 p-4 md:max-w-sm">
           {active ? (
             <>
-              <p className="text-sm font-semibold text-primary-electric">
+              <p className="text-sm font-semibold text-[#00D2FF]">
                 {ZONES.find((z) => z.key === activeZone).label}
               </p>
               <dl className="mt-2 grid grid-cols-4 gap-2 text-center text-sm">
