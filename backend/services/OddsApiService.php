@@ -13,6 +13,7 @@ class OddsApiService
     private string $apiKey;
     private string $baseUrl;
     private int $defaultTtl; // Cache validity duration in seconds (900 = 15 minutes)
+    private bool $autoFetch; // Flag to prevent automatic external calls on cache expiration in dev
 
     public function __construct(?PDO $db = null)
     {
@@ -20,6 +21,10 @@ class OddsApiService
         $this->apiKey = getenv('ODDS_API_KEY') ?: '';
         $this->baseUrl = getenv('ODDS_API_BASE_URL') ?: 'https://api.the-odds-api.com/v4';
         $this->defaultTtl = 900; // 15 minutes as defined in HU-05
+
+        // If ODDS_AUTO_FETCH is false, avoid triggering API calls on page reloads when cache expires
+        $autoFetchEnv = getenv('ODDS_AUTO_FETCH');
+        $this->autoFetch = $autoFetchEnv === false ? true : filter_var($autoFetchEnv, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -49,6 +54,23 @@ class OddsApiService
                     'count'      => count($cached['data']),
                     'data'       => $cached['data']
                 ];
+            }
+
+            // If auto-fetch is disabled in development (ODDS_AUTO_FETCH=false),
+            // reuse stale cache if available instead of consuming API quota on page reloads.
+            if (!$this->autoFetch) {
+                $stale = $this->getStaleCache($cacheKey);
+                if ($stale !== null) {
+                    return [
+                        'success'    => true,
+                        'source'     => 'cache_dev_lock',
+                        'warning'    => 'ODDS_AUTO_FETCH is disabled. Returning existing MySQL cache without external request.',
+                        'cache_key'  => $cacheKey,
+                        'fetched_at' => $stale['fetched_at'],
+                        'count'      => count($stale['data']),
+                        'data'       => $stale['data']
+                    ];
+                }
             }
         }
 
@@ -110,6 +132,17 @@ class OddsApiService
                     'source'  => 'cache',
                     'data'    => $cached['data']
                 ];
+            }
+
+            if (!$this->autoFetch) {
+                $stale = $this->getStaleCache($cacheKey);
+                if ($stale !== null) {
+                    return [
+                        'success' => true,
+                        'source'  => 'cache_dev_lock',
+                        'data'    => $stale['data']
+                    ];
+                }
             }
         }
 
