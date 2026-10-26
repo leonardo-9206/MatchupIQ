@@ -25,6 +25,10 @@ export default {
           blue: '#0066FF',
           glow: 'rgba(0, 212, 198, 0.15)',
         },
+        primary: {
+          electric: '#00D2FF',
+          deep: '#0066FF',
+        },
         edge: {
           positive: '#00E676',
           mint: '#1DBD8E',

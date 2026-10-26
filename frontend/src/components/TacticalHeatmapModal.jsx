@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { X, Flame, Info } from 'lucide-react';
+import { X, Flame, Info, Loader2, Database, CheckCircle2 } from 'lucide-react';
 import FieldHeatmap, { METRICS } from './FieldHeatmap/FieldHeatmap.jsx';
-import { mockPlayers, mockHeatmaps } from '../mocks/heatmapMock.js';
+import usePlayerHeatmap from '../hooks/usePlayerHeatmap.js';
+import { mockPlayers } from '../mocks/heatmapMock.js';
 
 export default function TacticalHeatmapModal({ isOpen, onClose }) {
   const [playerId, setPlayerId] = useState(mockPlayers[0]?.player_id ?? 1);
   const [metric, setMetric] = useState('attempts');
 
+  // Official hook by Josh connected to Joao's PHP endpoint (/api/tactics/heatmap.php)
+  const { zones, loading, source, player: apiPlayer, summary } = usePlayerHeatmap(playerId);
+
   if (!isOpen) return null;
 
-  const currentPlayer = mockPlayers.find((p) => p.player_id === playerId);
+  const currentPlayer = apiPlayer || mockPlayers.find((p) => p.player_id === playerId);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -26,11 +30,25 @@ export default function TacticalHeatmapModal({ isOpen, onClose }) {
                 <Flame className="h-5 w-5 text-sky-400" />
               </div>
               <div>
-                <h3 className="font-display text-xl font-bold text-white">
-                  Mapa Táctico del Campo NFL
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-xl font-bold text-white">
+                    Mapa Táctico del Campo NFL
+                  </h3>
+                  {source && (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold ${
+                        source === 'backend'
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      <Database className="h-2.5 w-2.5" />
+                      {source === 'backend' ? 'Live API · /api/tactics' : 'Mock Mode (Local)'}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-400 font-sans">
-                  Distribución de acarreos por carril y zona de ataque (Módulo Táctico)
+                  Distribución de acarreos por carril y zona de ataque (Módulo Táctico Oficial)
                 </p>
               </div>
             </div>
@@ -85,9 +103,14 @@ export default function TacticalHeatmapModal({ isOpen, onClose }) {
           </div>
 
           {/* Heatmap Visual Container */}
-          <div className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-[#050811] p-4">
-            {mockHeatmaps[playerId] ? (
-              <FieldHeatmap data={mockHeatmaps[playerId]} metric={metric} />
+          <div className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-[#050811] p-4 relative">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Loader2 className="h-8 w-8 animate-spin text-sky-400 mb-2" />
+                <p className="text-xs font-mono">Cargando métricas de carril táctico...</p>
+              </div>
+            ) : zones && zones.length > 0 ? (
+              <FieldHeatmap data={zones} metric={metric} />
             ) : (
               <div className="py-12 text-center text-xs text-slate-400">
                 No hay datos de mapa de calor registrados para este jugador.
