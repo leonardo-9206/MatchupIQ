@@ -1,71 +1,151 @@
-import { useState } from 'react';
-import FieldHeatmap, { METRICS } from './components/FieldHeatmap/FieldHeatmap.jsx';
-import usePlayerHeatmap from './hooks/usePlayerHeatmap.js';
-import { mockPlayers } from './mocks/heatmapMock.js';
+import React, { useState, useEffect, useMemo } from 'react';
+import Navbar from './components/Navbar.jsx';
+import HeroFilters from './components/HeroFilters.jsx';
+import FeaturedPropsGrid from './components/FeaturedPropsGrid.jsx';
+import PropsTableList from './components/PropsTableList.jsx';
+import StatsDrawer from './components/StatsDrawer.jsx';
+import TacticalHeatmapModal from './components/TacticalHeatmapModal.jsx';
+import { getProps } from './services/propsService.js';
+import { Loader2, RefreshCw } from 'lucide-react';
 
-// Temporary demo page for the tactical heatmap.
-// Carlos' dashboard will replace this once the main layout and router exist.
 export default function App() {
-  const [playerId, setPlayerId] = useState(mockPlayers[0].player_id);
-  const [metric, setMetric] = useState('attempts');
-  const { zones, source, loading } = usePlayerHeatmap(playerId);
+  const [selectedSport, setSelectedSport] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [propsData, setPropsData] = useState([]);
+  const [dataSource, setDataSource] = useState('mock');
+  const [loading, setLoading] = useState(true);
+  const [selectedProp, setSelectedProp] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Load props from asynchronous service (Fetch API)
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      setLoading(true);
+      try {
+        const res = await getProps(selectedSport);
+        if (isMounted) {
+          setPropsData(res.props);
+          setDataSource(res.source);
+        }
+      } catch (err) {
+        console.error('Error fetching props:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSport]);
+
+  // Client-side real-time filter by search query
+  const filteredProps = useMemo(() => {
+    if (!searchQuery.trim()) return propsData;
+    const q = searchQuery.toLowerCase().trim();
+    return propsData.filter((p) => {
+      return (
+        p.player_name.toLowerCase().includes(q) ||
+        p.team_name.toLowerCase().includes(q) ||
+        p.team_abbreviation.toLowerCase().includes(q) ||
+        p.bet_type_display.toLowerCase().includes(q) ||
+        p.player_position.toLowerCase().includes(q)
+      );
+    });
+  }, [propsData, searchQuery]);
+
+  const handleOpenStats = (prop) => {
+    setSelectedProp(prop);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseStats = () => {
+    setIsDrawerOpen(false);
+  };
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-[#00D2FF]">Rushing Heatmap</h1>
-          <p className="text-sm text-slate-400">Run lane breakdown per player</p>
-        </div>
-        {source && (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              source === 'backend' ? 'bg-emerald-500/10 text-[#00E676]' : 'bg-amber-500/10 text-[#FF9100]'
-            }`}
-          >
-            {source === 'backend' ? 'Live data · /api/tactics' : 'Mock data · backend offline'}
-          </span>
+    <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col justify-between selection:bg-brand-cyan/20 selection:text-brand-cyan">
+      
+      {/* Top Navigation */}
+      <div>
+        <Navbar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onOpenHeatmap={() => setIsHeatmapOpen(true)}
+        />
+
+        {/* Hero & Real-time Filter Bar */}
+        <HeroFilters
+          selectedSport={selectedSport}
+          onSelectSport={setSelectedSport}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          totalPropsCount={filteredProps.length}
+          featuredCount={filteredProps.filter((p) => p.is_featured).length}
+        />
+
+        {/* Loading Indicator */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Loader2 className="h-8 w-8 animate-spin text-brand-cyan mb-2" />
+            <p className="text-xs font-mono">Consultando cuotas en vivo...</p>
+          </div>
+        ) : (
+          <main>
+            {/* Level 1: Featured Picks Grid (Only on Dashboard tab or when searching) */}
+            {(activeTab === 'dashboard' || searchQuery) && (
+              <FeaturedPropsGrid
+                props={filteredProps}
+                onOpenStats={handleOpenStats}
+              />
+            )}
+
+            {/* Level 2: Full Propositions Catalog with USA Sportsbooks */}
+            <PropsTableList
+              props={filteredProps}
+              onOpenStats={handleOpenStats}
+              searchQuery={searchQuery}
+            />
+          </main>
         )}
-      </header>
-
-      <div className="flex flex-wrap gap-3">
-        {/* There is no players endpoint yet, so the list of RBs with heatmap data is still local */}
-        <select
-          value={playerId}
-          onChange={(e) => setPlayerId(Number(e.target.value))}
-          className="rounded-lg border border-slate-700 bg-surface-1 px-3 py-2 text-sm"
-        >
-          {mockPlayers.map((p) => (
-            <option key={p.player_id} value={p.player_id}>
-              {p.name} ({p.team} · {p.position})
-            </option>
-          ))}
-        </select>
-
-        <div className="flex rounded-lg border border-slate-700 bg-surface-1 p-1">
-          {Object.entries(METRICS).map(([key, { label }]) => (
-            <button
-              key={key}
-              onClick={() => setMetric(key)}
-              className={`rounded-md px-3 py-1 text-sm ${
-                metric === key ? 'bg-primary-deep text-white' : 'text-slate-400 hover:text-slate-100'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      <section className={`rounded-2xl border border-slate-800 bg-surface-1 p-4 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-        {zones.length > 0 ? (
-          <FieldHeatmap data={zones} metric={metric} />
-        ) : (
-          <p className="py-12 text-center text-sm text-slate-400">
-            {loading ? 'Loading heatmap…' : 'No heatmap data for this player.'}
-          </p>
-        )}
-      </section>
-    </main>
+      {/* Slide-over Stats & Odds Drawer */}
+      <StatsDrawer
+        prop={selectedProp}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseStats}
+      />
+
+      {/* Tactical NFL Field Heatmap Modal */}
+      <TacticalHeatmapModal
+        isOpen={isHeatmapOpen}
+        onClose={() => setIsHeatmapOpen(false)}
+      />
+
+      {/* Modern Minimal Footer */}
+      <footer className="mt-16 border-t border-slate-800/80 bg-[#070B16] py-8 text-center text-xs text-slate-400">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <img src="/logo_matchupiq_app.png" alt="MatchupIQ" className="h-6 w-auto opacity-75" />
+            <span className="font-display font-bold text-white tracking-wide">MatchupIQ</span>
+            <span className="text-[11px] text-slate-400">— Sprint 2 Frontend Delivery</span>
+          </div>
+
+          <div className="text-[11px] font-mono text-slate-400">
+            Lead Frontend & UI/UX: <strong className="text-slate-300">Carlos Antonio Villaseñor García</strong> (ID: 441641)
+          </div>
+
+          <div className="text-[11px] text-slate-400">
+            ISC 5-A • Programación de Sistemas Web
+          </div>
+        </div>
+      </footer>
+
+    </div>
   );
 }
