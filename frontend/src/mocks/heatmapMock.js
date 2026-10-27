@@ -1,7 +1,7 @@
 // Mock data for the FieldHeatmap component.
 // The shape mirrors what GET /api/tactics/heatmap.php is expected to return:
 // one row per `player_heatmaps` record (see Docs/DATA_DICTIONARY.md, table 2.10).
-// When Joao's endpoint is ready, replace this import with a fetch() in src/services/api.js.
+// Only used as a fallback by src/services/tacticsService.js when the backend is offline.
 
 export const mockPlayers = [
   { player_id: 3, name: 'Isiah Pacheco', position: 'RB', team: 'KC' },
@@ -17,7 +17,6 @@ export const mockHeatmaps = {
     { heatmap_id: 4, player_id: 3, field_zone: 'right_tackle', attempts: 38, yards_gained: 198, success_rate: 60.53 },
     { heatmap_id: 5, player_id: 3, field_zone: 'right_end', attempts: 18, yards_gained: 95, success_rate: 50.0 },
   ],
-  // Made-up values, only to test switching between players
   4: [
     { heatmap_id: 6, player_id: 4, field_zone: 'left_end', attempts: 31, yards_gained: 204, success_rate: 61.29 },
     { heatmap_id: 7, player_id: 4, field_zone: 'left_tackle', attempts: 36, yards_gained: 171, success_rate: 55.56 },
