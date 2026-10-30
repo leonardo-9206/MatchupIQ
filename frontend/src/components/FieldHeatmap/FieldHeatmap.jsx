@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import FootballField, { YARD, END_ZONE, FIELD_WIDTH } from './FootballField.jsx';
+import FootballField, { YARD, FIELD_WIDTH, yardToY } from './FootballField.jsx';
 import { heatColor, normalize, HEAT_STOPS } from './heatScale.js';
+import usePlayerHeatmap from '../../hooks/usePlayerHeatmap.js';
 
 // Lanes ordered from the offense's left to its right.
-// The offense attacks to the right of the screen, so its left side is the top of the field.
+// The offense attacks upward, so its left side is also the left of the screen (view from behind the QB).
 const ZONES = [
-  { key: 'left_end', label: 'Left End' },
-  { key: 'left_tackle', label: 'Left Tackle' },
-  { key: 'middle', label: 'Middle' },
-  { key: 'right_tackle', label: 'Right Tackle' },
-  { key: 'right_end', label: 'Right End' },
+  { key: 'left_end', label: 'Left End', short: 'L End' },
+  { key: 'left_tackle', label: 'Left Tackle', short: 'L Tackle' },
+  { key: 'middle', label: 'Middle', short: 'Middle' },
+  { key: 'right_tackle', label: 'Right Tackle', short: 'R Tackle' },
+  { key: 'right_end', label: 'Right End', short: 'R End' },
 ];
 
 export const METRICS = {
@@ -19,12 +20,20 @@ export const METRICS = {
   yards_per_attempt: { label: 'Yds / Att', format: (v) => v.toFixed(2) },
 };
 
-const LINE_OF_SCRIMMAGE = END_ZONE + 25 * YARD; // own 25-yard line
-const LANE_LENGTH = 30 * YARD;
-const LANE_HEIGHT = FIELD_WIDTH / ZONES.length;
+// Absolute yards (0 = back of the offense's end zone). The ball is snapped from the offense's own 25.
+const LINE_OF_SCRIMMAGE_YARD = 10 + 25;
+const LANE_YARDS = 35;
+// Visible window: a few yards behind the line (for the lane labels) up to a bit past the end of the lanes
+const VIEW_FROM_YARD = LINE_OF_SCRIMMAGE_YARD - 8;
+const VIEW_TO_YARD = LINE_OF_SCRIMMAGE_YARD + LANE_YARDS + 5;
+
+const LOS_Y = yardToY(LINE_OF_SCRIMMAGE_YARD);
+const LANE_HEIGHT = LANE_YARDS * YARD;
+const LANE_WIDTH = FIELD_WIDTH / ZONES.length;
 const LANE_GAP = 4;
 
 // Adds derived metrics to every row and indexes them by field_zone.
+// The backend already sends yards_per_attempt, but the mock doesn't, so we compute it here for both.
 function buildZoneStats(rows) {
   const byZone = {};
   for (const row of rows) {
@@ -36,110 +45,142 @@ function buildZoneStats(rows) {
   return byZone;
 }
 
-export default function FieldHeatmap({ data, metric = 'attempts' }) {
+/**
+ * Vertical rushing heatmap of the 5 run lanes.
+ *
+ * Two ways to use it:
+ *   <FieldHeatmap playerId={prop.player_id} />  -> loads the data itself and reloads when playerId changes
+ *   <FieldHeatmap data={zones} />               -> renders rows that the parent already loaded
+ */
+export default function FieldHeatmap({ playerId = null, data = null, metric = 'success_rate' }) {
   const [activeZone, setActiveZone] = useState(null);
 
-  const stats = useMemo(() => buildZoneStats(data), [data]);
+  // When the parent passes `data` we skip the request by sending null to the hook
+  const fetched = usePlayerHeatmap(data ? null : playerId);
+  const rows = data ?? fetched.zones;
+  const loading = !data && fetched.loading;
+
+  const stats = useMemo(() => buildZoneStats(rows), [rows]);
+
+  if (loading && rows.length === 0) {
+    return <p className="py-16 text-center text-sm text-slate-400">Loading heatmap…</p>;
+  }
+  if (rows.length === 0) {
+    return <p className="py-16 text-center text-sm text-slate-400">No heatmap data for this player.</p>;
+  }
+
   const values = ZONES.map((z) => stats[z.key]?.[metric] ?? 0);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const totalAttempts = ZONES.reduce((sum, z) => sum + (stats[z.key]?.attempts ?? 0), 0);
-
   const active = activeZone ? stats[activeZone] : null;
 
   return (
-    <div className="space-y-4">
-      <FootballField>
-        <defs>
-          {/* One fading gradient per lane: solid at the line of scrimmage, transparent downfield */}
-          {ZONES.map((zone, i) => (
-            <linearGradient key={zone.key} id={`lane-${zone.key}`} x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0.9" />
-              <stop offset="100%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0" />
-            </linearGradient>
-          ))}
-        </defs>
+    <div className={`flex flex-col gap-4 md:flex-row md:items-start ${loading ? 'opacity-60' : ''}`}>
+      <div className="mx-auto w-full max-w-md md:mx-0">
+        <FootballField fromYard={VIEW_FROM_YARD} toYard={VIEW_TO_YARD}>
+          <defs>
+            {/* One fading gradient per lane: solid at the line of scrimmage (bottom), transparent downfield (top) */}
+            {ZONES.map((zone, i) => (
+              <linearGradient key={zone.key} id={`lane-${zone.key}`} x1="0" x2="0" y1="1" y2="0">
+                <stop offset="0%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0.9" />
+                <stop offset="100%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0" />
+              </linearGradient>
+            ))}
+          </defs>
 
-        {ZONES.map((zone, i) => {
-          const row = stats[zone.key];
-          const y = i * LANE_HEIGHT + LANE_GAP / 2;
-          const height = LANE_HEIGHT - LANE_GAP;
-          const isActive = activeZone === zone.key;
-          const ypaX = LINE_OF_SCRIMMAGE + (row?.yards_per_attempt ?? 0) * YARD;
+          {ZONES.map((zone, i) => {
+            const row = stats[zone.key];
+            const x = i * LANE_WIDTH + LANE_GAP / 2;
+            const width = LANE_WIDTH - LANE_GAP;
+            const centerX = x + width / 2;
+            const isActive = activeZone === zone.key;
+            const ypaY = LOS_Y - (row?.yards_per_attempt ?? 0) * YARD;
 
-          return (
-            <g
-              key={zone.key}
-              tabIndex={0}
-              role="button"
-              aria-label={`${zone.label}: ${METRICS[metric].label} ${row ? METRICS[metric].format(row[metric]) : 'no data'}`}
-              className="cursor-pointer outline-none"
-              onMouseEnter={() => setActiveZone(zone.key)}
-              onMouseLeave={() => setActiveZone(null)}
-              onFocus={() => setActiveZone(zone.key)}
-              onBlur={() => setActiveZone(null)}
-            >
-              <rect
-                x={LINE_OF_SCRIMMAGE}
-                y={y}
-                width={LANE_LENGTH}
-                height={height}
-                rx="8"
-                fill={`url(#lane-${zone.key})`}
-                stroke={isActive ? '#00D2FF' : 'transparent'}
-                strokeWidth="3"
-              />
-              {/* Average gain marker */}
-              {row && (
-                <g>
-                  <line x1={ypaX} y1={y + 10} x2={ypaX} y2={y + height - 10} stroke="#ffffff" strokeWidth="3" strokeDasharray="6 4" />
-                  <text x={ypaX + 8} y={y + height / 2 + 6} fill="#ffffff" fontSize="16" fontWeight="600">
-                    {row.yards_per_attempt.toFixed(1)} yd
-                  </text>
-                </g>
-              )}
-              {/* Lane label behind the line of scrimmage, on a pill so it stays readable over the yard numbers */}
-              <rect
-                x={LINE_OF_SCRIMMAGE - 150}
-                y={y + height / 2 - 16}
-                width="140"
-                height="32"
-                rx="16"
-                fill="#0E1626"
-                fillOpacity="0.85"
-                stroke={isActive ? '#00D2FF' : 'transparent'}
-              />
-              <text
-                x={LINE_OF_SCRIMMAGE - 80}
-                y={y + height / 2 + 6}
-                fill="#ffffff"
-                fillOpacity={isActive ? 1 : 0.7}
-                fontSize="18"
-                fontWeight="600"
-                textAnchor="middle"
+            return (
+              <g
+                key={zone.key}
+                tabIndex={0}
+                role="button"
+                aria-label={`${zone.label}: ${METRICS[metric].label} ${row ? METRICS[metric].format(row[metric]) : 'no data'}`}
+                className="cursor-pointer outline-none"
+                onMouseEnter={() => setActiveZone(zone.key)}
+                onMouseLeave={() => setActiveZone(null)}
+                onFocus={() => setActiveZone(zone.key)}
+                onBlur={() => setActiveZone(null)}
               >
-                {zone.label}
-              </text>
-            </g>
-          );
-        })}
+                <rect
+                  x={x}
+                  y={LOS_Y - LANE_HEIGHT}
+                  width={width}
+                  height={LANE_HEIGHT}
+                  rx="8"
+                  fill={`url(#lane-${zone.key})`}
+                  stroke={isActive ? '#00D2FF' : 'transparent'}
+                  strokeWidth="3"
+                />
+                {/* Average gain marker: how far upfield the player gets per carry in this lane */}
+                {row && (
+                  <g>
+                    <line x1={x + 10} y1={ypaY} x2={x + width - 10} y2={ypaY} stroke="#ffffff" strokeWidth="3" strokeDasharray="6 4" />
+                    <text x={centerX} y={ypaY - 10} fill="#ffffff" fontSize="16" fontWeight="600" textAnchor="middle">
+                      {row.yards_per_attempt.toFixed(1)} yd
+                    </text>
+                  </g>
+                )}
+                {/* Lane label behind the line of scrimmage, on a pill so it stays readable over the field */}
+                <rect
+                  x={x + 4}
+                  y={LOS_Y + 24}
+                  width={width - 8}
+                  height="32"
+                  rx="16"
+                  fill="#0E1626"
+                  fillOpacity="0.85"
+                  stroke={isActive ? '#00D2FF' : 'transparent'}
+                />
+                <text
+                  x={centerX}
+                  y={LOS_Y + 46}
+                  fill="#ffffff"
+                  fillOpacity={isActive ? 1 : 0.75}
+                  fontSize="15"
+                  fontWeight="600"
+                  textAnchor="middle"
+                >
+                  {zone.short}
+                </text>
+              </g>
+            );
+          })}
 
-        {/* Line of scrimmage */}
-        <line
-          x1={LINE_OF_SCRIMMAGE}
-          y1={0}
-          x2={LINE_OF_SCRIMMAGE}
-          y2={FIELD_WIDTH}
-          stroke="#00D2FF"
-          strokeWidth="4"
-          strokeDasharray="12 8"
-          pointerEvents="none"
-        />
-      </FootballField>
+          {/* Line of scrimmage */}
+          <line
+            x1={0}
+            y1={LOS_Y}
+            x2={FIELD_WIDTH}
+            y2={LOS_Y}
+            stroke="#00D2FF"
+            strokeWidth="4"
+            strokeDasharray="12 8"
+            pointerEvents="none"
+          />
+        </FootballField>
+      </div>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="flex w-full flex-col gap-4 md:max-w-xs">
+        {!data && fetched.source && (
+          <span
+            className={`self-start rounded-full px-3 py-1 text-xs font-semibold ${
+              fetched.source === 'backend' ? 'bg-emerald-500/10 text-[#00E676]' : 'bg-amber-500/10 text-[#FF9100]'
+            }`}
+          >
+            {fetched.source === 'backend' ? 'Live data · /api/tactics' : 'Mock data · backend offline'}
+          </span>
+        )}
+
         {/* Legend */}
-        <div className="w-full max-w-xs">
+        <div>
           <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">{METRICS[metric].label}</p>
           <div className="h-3 rounded-full" style={{ background: `linear-gradient(to right, ${HEAT_STOPS.join(', ')})` }} />
           <div className="mt-1 flex justify-between text-xs text-slate-400">
@@ -149,7 +190,7 @@ export default function FieldHeatmap({ data, metric = 'attempts' }) {
         </div>
 
         {/* Zone detail */}
-        <div className="min-h-[88px] w-full rounded-xl border border-slate-800 bg-surface-2 p-4 md:max-w-sm">
+        <div className="min-h-[88px] rounded-xl border border-slate-800 bg-surface-2 p-4">
           {active ? (
             <>
               <p className="text-sm font-semibold text-[#00D2FF]">
