@@ -17,7 +17,8 @@ class Prop
     }
 
     /**
-     * Retrieves all available player props with related game, team, and bookmaker details.
+     * Retrieves all available player props with related game, team, opponent defensive rank, and bookmaker details.
+     * Computes the opposing team's defensive rank based on home/away match relationships.
      *
      * @param string|null $sportSlug Optional filter by sport (e.g. 'nfl', 'ligamx')
      * @param int $limit Maximum records to return (default 50)
@@ -40,7 +41,15 @@ class Prop
                     t.team_id,
                     t.name AS team_name,
                     t.abbreviation AS team_abbreviation,
-                    t.defensive_rank,
+                    t.defensive_rank AS team_defensive_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.defensive_rank
+                        ELSE home_t.defensive_rank
+                    END AS opposing_defensive_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.name
+                        ELSE home_t.name
+                    END AS opponent_name,
                     b.bookmaker_id,
                     b.name AS bookmaker_name,
                     g.game_id,
@@ -52,7 +61,9 @@ class Prop
                 INNER JOIN teams t ON pl.team_id = t.team_id
                 INNER JOIN sports s ON t.sport_id = s.sport_id
                 INNER JOIN bookmakers b ON p.bookmaker_id = b.bookmaker_id
-                INNER JOIN games g ON p.game_id = g.game_id";
+                INNER JOIN games g ON p.game_id = g.game_id
+                INNER JOIN teams home_t ON g.home_team_id = home_t.team_id
+                INNER JOIN teams away_t ON g.away_team_id = away_t.team_id";
 
         if ($sportSlug !== null && !empty($sportSlug)) {
             $sql .= " WHERE s.slug = :sport_slug";
@@ -73,7 +84,7 @@ class Prop
     }
 
     /**
-     * Find a specific prop by ID with full details.
+     * Find a specific prop by ID with full details including opponent matchup metrics.
      */
     public function findById(int $propId): ?array
     {
@@ -89,15 +100,32 @@ class Prop
                     pl.name AS player_name,
                     pl.position AS player_position,
                     CAST(pl.stat_average AS FLOAT) AS stat_average,
+                    t.team_id,
                     t.name AS team_name,
                     t.abbreviation AS team_abbreviation,
+                    t.defensive_rank AS team_defensive_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.defensive_rank
+                        ELSE home_t.defensive_rank
+                    END AS opposing_defensive_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.name
+                        ELSE home_t.name
+                    END AS opponent_name,
+                    b.bookmaker_id,
                     b.name AS bookmaker_name,
-                    g.game_date
+                    g.game_id,
+                    g.game_date,
+                    s.name AS sport_name,
+                    s.slug AS sport_slug
                 FROM props p
                 INNER JOIN players pl ON p.player_id = pl.player_id
                 INNER JOIN teams t ON pl.team_id = t.team_id
+                INNER JOIN sports s ON t.sport_id = s.sport_id
                 INNER JOIN bookmakers b ON p.bookmaker_id = b.bookmaker_id
                 INNER JOIN games g ON p.game_id = g.game_id
+                INNER JOIN teams home_t ON g.home_team_id = home_t.team_id
+                INNER JOIN teams away_t ON g.away_team_id = away_t.team_id
                 WHERE p.prop_id = :prop_id
                 LIMIT 1";
 
@@ -107,5 +135,17 @@ class Prop
 
         $result = $stmt->fetch();
         return $result ?: null;
+    }
+
+    /**
+     * Updates the calculated edge value for a given prop record.
+     */
+    public function updateCalculatedEdge(int $propId, float $calculatedEdge): bool
+    {
+        $sql = "UPDATE props SET calculated_edge = :calculated_edge WHERE prop_id = :prop_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':calculated_edge', $calculatedEdge);
+        $stmt->bindValue(':prop_id', $propId, PDO::PARAM_INT);
+        return $stmt->execute();
     }
 }

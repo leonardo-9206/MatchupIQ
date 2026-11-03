@@ -3,10 +3,12 @@
  * AuthController
  * Handles authentication business logic: registration, login, logout, and session verification.
  * Adheres to OWASP recommendations: Bcrypt hashing, session fixation prevention, and input sanitization.
+ * Employs Validator middleware for centralized, decoupled request validation.
  */
 
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
+require_once __DIR__ . '/../middlewares/Validator.php';
 require_once __DIR__ . '/../config/Response.php';
 
 class AuthController
@@ -26,28 +28,21 @@ class AuthController
     {
         $input = $this->getJsonInput();
 
-        $fullName = trim($input['full_name'] ?? '');
-        $email = trim($input['email'] ?? '');
-        $password = $input['password'] ?? '';
+        // Centralized input validation via Validator service
+        $validator = Validator::make($input, [
+            'full_name' => 'required|min:3',
+            'email'     => 'required|email',
+            'password'  => 'required|min:8'
+        ]);
 
-        $errors = [];
-
-        // Validation
-        if (empty($fullName) || mb_strlen($fullName) < 3) {
-            $errors['full_name'] = 'Full name is required and must be at least 3 characters.';
+        if ($validator->fails()) {
+            Response::error('Validation failed. Please correct the specified fields.', 422, $validator->errors());
         }
 
-        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = 'A valid email address is required.';
-        }
-
-        if (empty($password) || strlen($password) < 8) {
-            $errors['password'] = 'Password is required and must be at least 8 characters long.';
-        }
-
-        if (!empty($errors)) {
-            Response::error('Validation failed. Please correct the specified fields.', 422, $errors);
-        }
+        $validated = $validator->validated();
+        $fullName = $validated['full_name'];
+        $email = $validated['email'];
+        $password = $input['password'];
 
         // Check for duplicate email
         if ($this->userModel->emailExists($email)) {
@@ -93,12 +88,19 @@ class AuthController
     {
         $input = $this->getJsonInput();
 
-        $email = trim($input['email'] ?? '');
-        $password = $input['password'] ?? '';
+        // Centralized validation for login credentials
+        $validator = Validator::make($input, [
+            'email'    => 'required|email',
+            'password' => 'required'
+        ]);
 
-        if (empty($email) || empty($password)) {
-            Response::error('Email and password are required.', 400);
+        if ($validator->fails()) {
+            Response::error('Email and password are required.', 400, $validator->errors());
         }
+
+        $validated = $validator->validated();
+        $email = $validated['email'];
+        $password = $input['password'];
 
         $user = $this->userModel->findByEmail($email);
 
