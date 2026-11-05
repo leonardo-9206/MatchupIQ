@@ -1,16 +1,9 @@
-import React, { useState } from 'react';
-import { X, Star, BarChart3, Shield, BookmarkPlus, Check, Flame } from 'lucide-react';
+import React from 'react';
+import { X, Star, BarChart3, Shield, BookmarkPlus, Flame } from 'lucide-react';
 import Button from './common/Button.jsx';
 
-export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap }) {
-  const [savedToTracker, setSavedToTracker] = useState(false);
-
+export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAddBet }) {
   if (!isOpen || !prop) return null;
-
-  const handleSavePick = () => {
-    setSavedToTracker(true);
-    setTimeout(() => setSavedToTracker(false), 2500);
-  };
 
   const isNfl = prop.sport_slug === 'nfl';
   const hasHeatmap = isNfl && (prop.bet_type === 'rushing_yards' || prop.bet_type === 'receiving_yards' || prop.bet_type === 'passing_yards');
@@ -199,16 +192,16 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap }) {
 
           </div>
 
-          {/* Drawer Footer: Add to Bet Tracker */}
+          {/* Drawer Footer: Open Add Bet Modal */}
           <div className="border-t border-slate-800 p-5 bg-[#050811]">
             <Button
-              variant={savedToTracker ? 'secondary' : 'primary'}
+              variant="primary"
               size="lg"
-              icon={savedToTracker ? Check : BookmarkPlus}
-              onClick={handleSavePick}
+              icon={BookmarkPlus}
+              onClick={() => onAddBet(prop)}
               className="w-full justify-center"
             >
-              <span>{savedToTracker ? '¡Guardado en tu Bet Tracker!' : 'Agregar Pick a mi Bet Tracker'}</span>
+              <span>Agregar a mi Bet Tracker</span>
             </Button>
             <p className="text-center text-[10px] text-slate-500 mt-2 font-mono">
               Registra cuota {prop.american_odds} con {prop.best_bookmaker}

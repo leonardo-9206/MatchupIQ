@@ -6,8 +6,11 @@ import PropsTableList from './components/PropsTableList.jsx';
 import StatsDrawer from './components/StatsDrawer.jsx';
 import TacticalHeatmapModal from './components/TacticalHeatmapModal.jsx';
 import AuthModal from './components/AuthModal.jsx';
+import BetTrackerView from './components/BetTrackerView.jsx';
+import AddBetModal from './components/AddBetModal.jsx';
 import { getProps } from './services/propsService.js';
 import { checkSession, logoutUser } from './services/authService.js';
+import { getBets, createBet, updateBet, deleteBet } from './services/trackerService.js';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -20,12 +23,17 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
   const [heatmapPlayerId, setHeatmapPlayerId] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'catalog' | 'tracker'
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
+
+  // Bet Tracker State (Sprint 3)
+  const [bets, setBets] = useState([]);
+  const [addBetModalOpen, setAddBetModalOpen] = useState(false);
+  const [betModalProp, setBetModalProp] = useState(null);
 
   // Verify initial user session
   useEffect(() => {
@@ -36,6 +44,15 @@ export default function App() {
       }
     }
     verifyUser();
+  }, []);
+
+  // Load Bet Tracker bets
+  useEffect(() => {
+    async function loadBets() {
+      const res = await getBets();
+      setBets(res.bets);
+    }
+    loadBets();
   }, []);
 
   // Load props from asynchronous service (Fetch API)
@@ -96,6 +113,40 @@ export default function App() {
     setCurrentUser(null);
   };
 
+  // Bet Tracker Handlers (Sprint 3)
+  const handleOpenAddBetModal = (prop = null) => {
+    setBetModalProp(prop);
+    setAddBetModalOpen(true);
+  };
+
+  const handleBetAdded = async (betData) => {
+    const res = await createBet(betData);
+    if (res.success) {
+      setBets((prev) => [res.bet, ...prev]);
+    }
+  };
+
+  const handleUpdateBetStatus = async (betId, newStatus) => {
+    const res = await updateBet(betId, { status: newStatus });
+    if (res.success) {
+      setBets((prev) => prev.map((b) => (b.bet_id === betId ? { ...b, status: newStatus } : b)));
+    }
+  };
+
+  const handleUpdateBetNotes = async (betId, newNotes) => {
+    const res = await updateBet(betId, { notes: newNotes });
+    if (res.success) {
+      setBets((prev) => prev.map((b) => (b.bet_id === betId ? { ...b, notes: newNotes } : b)));
+    }
+  };
+
+  const handleDeleteBet = async (betId) => {
+    const res = await deleteBet(betId);
+    if (res.success) {
+      setBets((prev) => prev.filter((b) => b.bet_id !== betId));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col justify-between selection:bg-brand-cyan/20 selection:text-brand-cyan">
       
@@ -108,42 +159,58 @@ export default function App() {
           onOpenLogin={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
           onOpenRegister={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
           onLogout={handleLogout}
+          trackerBetsCount={bets.filter((b) => b.status === 'pending').length}
         />
 
-        {/* Hero & Real-time Filter Bar */}
-        <HeroFilters
-          selectedSport={selectedSport}
-          onSelectSport={setSelectedSport}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          totalPropsCount={filteredProps.length}
-          featuredCount={filteredProps.filter((p) => p.is_featured).length}
-        />
-
-        {/* Loading Indicator */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-cyan mb-2" />
-            <p className="text-xs font-mono">Consultando cuotas en vivo...</p>
-          </div>
-        ) : (
+        {/* View Switcher: Bet Tracker View vs Main Dashboard */}
+        {activeTab === 'tracker' ? (
           <main>
-            {/* Level 1: Featured Picks Grid (Only on Dashboard tab or when searching) */}
-            {(activeTab === 'dashboard' || searchQuery) && (
-              <FeaturedPropsGrid
-                props={filteredProps}
-                onOpenStats={handleOpenStats}
-                onOpenHeatmap={handleOpenHeatmap}
-              />
-            )}
-
-            {/* Level 2: Full Propositions Catalog with USA Sportsbooks */}
-            <PropsTableList
-              props={filteredProps}
-              onOpenStats={handleOpenStats}
-              searchQuery={searchQuery}
+            <BetTrackerView
+              bets={bets}
+              onUpdateStatus={handleUpdateBetStatus}
+              onUpdateNotes={handleUpdateBetNotes}
+              onDeleteBet={handleDeleteBet}
+              onOpenAddModal={handleOpenAddBetModal}
             />
           </main>
+        ) : (
+          <>
+            {/* Hero & Real-time Filter Bar */}
+            <HeroFilters
+              selectedSport={selectedSport}
+              onSelectSport={setSelectedSport}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              totalPropsCount={filteredProps.length}
+              featuredCount={filteredProps.filter((p) => p.is_featured).length}
+            />
+
+            {/* Loading Indicator */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Loader2 className="h-8 w-8 animate-spin text-brand-cyan mb-2" />
+                <p className="text-xs font-mono">Consultando cuotas en vivo...</p>
+              </div>
+            ) : (
+              <main>
+                {/* Level 1: Featured Picks Grid (Only on Dashboard tab or when searching) */}
+                {(activeTab === 'dashboard' || searchQuery) && (
+                  <FeaturedPropsGrid
+                    props={filteredProps}
+                    onOpenStats={handleOpenStats}
+                    onOpenHeatmap={handleOpenHeatmap}
+                  />
+                )}
+
+                {/* Level 2: Full Propositions Catalog with USA Sportsbooks */}
+                <PropsTableList
+                  props={filteredProps}
+                  onOpenStats={handleOpenStats}
+                  searchQuery={searchQuery}
+                />
+              </main>
+            )}
+          </>
         )}
       </div>
 
@@ -153,6 +220,10 @@ export default function App() {
         isOpen={isDrawerOpen}
         onClose={handleCloseStats}
         onOpenHeatmap={handleOpenHeatmap}
+        onAddBet={(prop) => {
+          handleCloseStats();
+          handleOpenAddBetModal(prop);
+        }}
       />
 
       {/* Tactical NFL Field Heatmap Modal directly bound to player */}
@@ -160,6 +231,14 @@ export default function App() {
         isOpen={isHeatmapOpen}
         selectedPlayerId={heatmapPlayerId}
         onClose={() => setIsHeatmapOpen(false)}
+      />
+
+      {/* Add / Register Bet Modal (Sprint 3) */}
+      <AddBetModal
+        isOpen={addBetModalOpen}
+        onClose={() => setAddBetModalOpen(false)}
+        prop={betModalProp}
+        onBetAdded={handleBetAdded}
       />
 
       {/* Authentication Modal */}

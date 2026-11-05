@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Layers, LogIn, LogOut, User } from 'lucide-react';
+import { Activity, Layers, BookmarkCheck, LogIn, LogOut } from 'lucide-react';
 import Button from './common/Button.jsx';
 
 export default function Navbar({
@@ -9,6 +9,7 @@ export default function Navbar({
   onOpenLogin,
   onOpenRegister,
   onLogout,
+  trackerBetsCount = 0,
 }) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070B16]/95 backdrop-blur-md">
@@ -57,6 +58,22 @@ export default function Navbar({
             onClick={() => onSelectTab('catalog')}
           >
             <span>Catálogo</span>
+          </Button>
+
+          {/* Bet Tracker Tab (Sprint 3) */}
+          <Button
+            variant={activeTab === 'tracker' ? 'primary' : 'ghost'}
+            size="sm"
+            icon={BookmarkCheck}
+            onClick={() => onSelectTab('tracker')}
+            className="relative"
+          >
+            <span>Bet Tracker</span>
+            {trackerBetsCount > 0 && (
+              <span className="ml-1 rounded-full bg-emerald-500/20 text-edge-positive px-1.5 py-0.2 text-[10px] font-mono font-bold">
+                {trackerBetsCount}
+              </span>
+            )}
           </Button>
         </nav>
 
