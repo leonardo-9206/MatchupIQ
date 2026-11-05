@@ -53,7 +53,7 @@ export default function App() {
       setBets(res.bets);
     }
     loadBets();
-  }, []);
+  }, [currentUser]);
 
   // Load props from asynchronous service (Fetch API)
   useEffect(() => {
@@ -270,3 +270,4 @@ export default function App() {
     </div>
   );
 }
+

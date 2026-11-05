@@ -92,7 +92,7 @@ export default function Navbar({
                 </div>
                 <div className="hidden sm:block text-left leading-tight">
                   <span className="block font-semibold text-slate-200">{currentUser.full_name || currentUser.email}</span>
-                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role || 'Usuario'}</span>
+                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role_name || currentUser.role || 'Usuario'}</span>
                 </div>
               </div>
 
@@ -132,3 +132,4 @@ export default function Navbar({
     </header>
   );
 }
+
