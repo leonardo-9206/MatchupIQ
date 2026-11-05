@@ -12,6 +12,7 @@ CREATE DATABASE IF NOT EXISTS `matchupiq_db`
 USE `matchupiq_db`;
 
 -- Drop tables in reverse dependency order to ensure clean execution
+DROP TABLE IF EXISTS `player_game_logs`;
 DROP TABLE IF EXISTS `odds_cache`;
 DROP TABLE IF EXISTS `coverage_splits`;
 DROP TABLE IF EXISTS `player_heatmaps`;
@@ -186,7 +187,26 @@ CREATE TABLE `coverage_splits` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- 5. External API Caching & Optimization
+-- 5. Player Historical Game Logs (Trends & Hit Rates)
+-- =====================================================
+
+CREATE TABLE `player_game_logs` (
+    `log_id` INT AUTO_INCREMENT PRIMARY KEY,
+    `player_id` INT NOT NULL,
+    `opponent_abbr` VARCHAR(10) NOT NULL,
+    `stat_type` VARCHAR(50) NOT NULL,
+    `stat_value` DECIMAL(6,2) NOT NULL,
+    `game_date` DATE NOT NULL,
+    `is_home` TINYINT(1) NOT NULL DEFAULT 1,
+    INDEX `idx_player_stat_date` (`player_id`, `stat_type`, `game_date`),
+    CONSTRAINT `fk_game_logs_player` FOREIGN KEY (`player_id`)
+        REFERENCES `players` (`player_id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 6. External API Caching & Optimization
 -- =====================================================
 
 CREATE TABLE `odds_cache` (

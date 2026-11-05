@@ -7,6 +7,7 @@ USE `matchupiq_db`;
 
 -- Disable foreign key checks for clean truncation and seeding
 SET FOREIGN_KEY_CHECKS = 0;
+DELETE FROM `player_game_logs`;
 DELETE FROM `coverage_splits`;
 DELETE FROM `player_heatmaps`;
 DELETE FROM `bet_tracker`;
@@ -100,3 +101,40 @@ INSERT INTO `player_heatmaps` (`heatmap_id`, `player_id`, `field_zone`, `attempt
 INSERT INTO `coverage_splits` (`split_id`, `player_id`, `coverage_type`, `targets`, `receptions`, `catch_rate`) VALUES
 (1, 2, 'man', 35, 26, 74.29),
 (2, 2, 'zone', 58, 46, 79.31);
+
+-- =====================================================
+-- 5. Player Historical Game Logs (ESPN API Data Structure)
+-- 5-game recent performance logs feeding player trend charts & hit rates
+-- =====================================================
+
+-- Patrick Mahomes (player_id = 1, passing_yards, line = 265.5, avg = 282.4) -> 4/5 over
+INSERT INTO `player_game_logs` (`player_id`, `opponent_abbr`, `stat_type`, `stat_value`, `game_date`, `is_home`) VALUES
+(1, 'LAC', 'passing_yards', 295.00, '2026-10-18', 1),
+(1, 'DEN', 'passing_yards', 272.00, '2026-10-11', 0),
+(1, 'LV',  'passing_yards', 312.00, '2026-10-04', 1),
+(1, 'SF',  'passing_yards', 255.00, '2026-09-27', 0),
+(1, 'BAL', 'passing_yards', 291.00, '2026-09-20', 1);
+
+-- Isiah Pacheco (player_id = 3, rushing_yards, line = 62.5, avg = 66.8) -> 4/5 over
+INSERT INTO `player_game_logs` (`player_id`, `opponent_abbr`, `stat_type`, `stat_value`, `game_date`, `is_home`) VALUES
+(3, 'LAC', 'rushing_yards', 74.00, '2026-10-18', 1),
+(3, 'DEN', 'rushing_yards', 66.00, '2026-10-11', 0),
+(3, 'LV',  'rushing_yards', 82.00, '2026-10-04', 1),
+(3, 'SF',  'rushing_yards', 58.00, '2026-09-27', 0),
+(3, 'BAL', 'rushing_yards', 71.00, '2026-09-20', 1);
+
+-- Christian McCaffrey (player_id = 4, rushing_yards, line = 78.5, avg = 85.5) -> 4/5 over
+INSERT INTO `player_game_logs` (`player_id`, `opponent_abbr`, `stat_type`, `stat_value`, `game_date`, `is_home`) VALUES
+(4, 'ARI', 'rushing_yards', 92.00, '2026-10-18', 1),
+(4, 'SEA', 'rushing_yards', 88.00, '2026-10-11', 0),
+(4, 'KC',  'rushing_yards', 72.00, '2026-10-04', 1),
+(4, 'LAR', 'rushing_yards', 95.00, '2026-09-27', 0),
+(4, 'DAL', 'rushing_yards', 84.00, '2026-09-20', 1);
+
+-- Travis Kelce (player_id = 2, receiving_yards, avg = 71.3)
+INSERT INTO `player_game_logs` (`player_id`, `opponent_abbr`, `stat_type`, `stat_value`, `game_date`, `is_home`) VALUES
+(2, 'LAC', 'receiving_yards', 78.00, '2026-10-18', 1),
+(2, 'DEN', 'receiving_yards', 64.00, '2026-10-11', 0),
+(2, 'LV',  'receiving_yards', 89.00, '2026-10-04', 1),
+(2, 'SF',  'receiving_yards', 58.00, '2026-09-27', 0),
+(2, 'BAL', 'receiving_yards', 75.00, '2026-09-20', 1);
