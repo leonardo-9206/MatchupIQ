@@ -206,6 +206,38 @@ class TestRunner
             $this->assert("POST /api/props/calculate-edge.php returns 200 OK", $customEdge['code'] === 200);
             $this->assert("Custom edge calculation returns positive +EV recommendation", 
                 ($customEdge['json']['data']['analysis']['calculated_edge'] ?? 0) > 0);
+
+            // Relational synchronization verification: OddsApiService::syncOddsToProps
+            require_once __DIR__ . '/../services/OddsApiService.php';
+            $oddsService = new OddsApiService();
+            $mockEvent = [
+                'id' => 'test_suite_event_nfl',
+                'sport_key' => 'americanfootball_nfl',
+                'home_team' => 'Kansas City Chiefs',
+                'away_team' => 'San Francisco 49ers',
+                'bookmakers' => [
+                    [
+                        'key' => 'bet365',
+                        'title' => 'Bet365',
+                        'markets' => [
+                            [
+                                'key' => 'player_pass_yds',
+                                'outcomes' => [
+                                    ['name' => 'Over', 'description' => 'Patrick Mahomes', 'price' => 1.95, 'point' => 275.5],
+                                    ['name' => 'Under', 'description' => 'Patrick Mahomes', 'price' => 1.85, 'point' => 275.5]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+            $syncMetrics = $oddsService->syncOddsToProps([$mockEvent]);
+            $this->assert("OddsApiService::syncOddsToProps processes events and updates props",
+                $syncMetrics['events_processed'] >= 1 && ($syncMetrics['updated'] + $syncMetrics['inserted']) >= 1);
+
+            $syncedPropCheck = $this->request('GET', '/api/props/show.php?id=1');
+            $this->assert("GET /api/props/show.php?id=1 reflects synchronized line threshold (275.5)",
+                (float) ($syncedPropCheck['json']['data']['prop']['line_over'] ?? 0) === 275.5);
         }
 
         // ==========================================
