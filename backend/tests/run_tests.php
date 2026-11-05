@@ -9,6 +9,7 @@
  * 5. Persistent Props Data Flow & Value Edge Calculation
  * 6. NFL Tactical Analytics (Heatmaps & Coverage Splits)
  * 7. Bet Tracker Full CRUD & OWASP BOLA Access Control
+ * 8. Protected Admin Endpoints & Quota Shielding
  *
  * Usage:
  *   php backend/tests/run_tests.php [baseUrl]
@@ -68,6 +69,13 @@ class TestRunner
         $this->assert("GET /api/auth/me.php without session is rejected with 401 Unauthorized", $unauthMe['code'] === 401);
         $this->assert("401 response contains error message", isset($unauthMe['json']['message']));
 
+        // Admin route protection & Method verification
+        $unauthAdmin = $this->request('POST', '/api/admin/odds/refresh.php');
+        $this->assert("POST /api/admin/odds/refresh.php without session is rejected with 401 Unauthorized", $unauthAdmin['code'] === 401);
+
+        $invalidAdminMethod = $this->request('GET', '/api/admin/odds/refresh.php');
+        $this->assert("GET /api/admin/odds/refresh.php is blocked with 405 Method Not Allowed", $invalidAdminMethod['code'] === 405);
+
         // ==========================================
         // Suite 3: Input Validation & Sanitization
         // ==========================================
@@ -93,9 +101,9 @@ class TestRunner
         $this->assert("Login with empty payload returns 400 Bad Request", $emptyLogin['code'] === 400);
 
         // ==========================================
-        // Suite 4: Authentication Lifecycle
+        // Suite 4: Authentication Lifecycle & RBAC
         // ==========================================
-        $this->section("Suite 4: Secure Authentication Flow");
+        $this->section("Suite 4: Secure Authentication Flow & RBAC");
 
         $uniqueEmail = 'user_' . substr(md5(uniqid()), 0, 8) . '@matchupiq.test';
         $testPassword = 'TestPassword2026!';
@@ -142,6 +150,11 @@ class TestRunner
             $this->assert("GET /api/auth/me.php with active cookie returns 200 OK", $authMe['code'] === 200);
             $this->assert("Session accurately identifies authenticated user", 
                 ($authMe['json']['data']['user']['email'] ?? '') === $uniqueEmail);
+
+            // RBAC Verification: Regular user is blocked from admin endpoint
+            $userAdminForbidden = $this->request('POST', '/api/admin/odds/refresh.php', null, true);
+            $this->assert("RBAC: Regular authenticated user accessing /api/admin/odds/refresh.php is blocked with 403 Forbidden", 
+                $userAdminForbidden['code'] === 403);
 
             // Logout
             $logout = $this->request('POST', '/api/auth/logout.php', null, true);
