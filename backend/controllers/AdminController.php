@@ -6,16 +6,19 @@
  */
 
 require_once __DIR__ . '/../services/OddsApiService.php';
+require_once __DIR__ . '/../services/EspnApiService.php';
 require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
 require_once __DIR__ . '/../config/Response.php';
 
 class AdminController
 {
     private OddsApiService $oddsService;
+    private EspnApiService $espnService;
 
     public function __construct()
     {
         $this->oddsService = new OddsApiService();
+        $this->espnService = new EspnApiService();
     }
 
     /**
@@ -83,6 +86,33 @@ class AdminController
         } catch (Throwable $e) {
             error_log('AdminController Refresh Odds Error: ' . $e->getMessage());
             Response::error('Internal server error during odds refresh: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Triggers live ingestion of recent game logs and athlete catalog expansion from ESPN API.
+     * Route: POST /api/admin/espn/sync.php
+     * Access: Administrator role only
+     */
+    public function syncEspnData(): void
+    {
+        // 1. RBAC Guard: Verify session and require 'admin' role
+        $adminUser = AuthMiddleware::requireRole('admin');
+
+        $startTime = microtime(true);
+
+        try {
+            $result = $this->espnService->syncAllPresetAthletes(5);
+            $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+
+            Response::success('ESPN athlete game logs synchronized successfully.', array_merge($result, [
+                'triggered_by' => $adminUser['email'],
+                'benchmark_ms' => $executionTimeMs
+            ]), 200);
+
+        } catch (Throwable $e) {
+            error_log('AdminController ESPN Sync Error: ' . $e->getMessage());
+            Response::error('Internal server error during ESPN synchronization: ' . $e->getMessage(), 500);
         }
     }
 }
