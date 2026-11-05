@@ -1,8 +1,8 @@
 import React from 'react';
 import PropCard from './PropCard.jsx';
-import { Sparkles, Trophy } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
-export default function FeaturedPropsGrid({ props, onOpenStats }) {
+export default function FeaturedPropsGrid({ props, onOpenStats, onOpenHeatmap }) {
   const featured = props.filter((p) => p.is_featured);
 
   if (featured.length === 0) {
@@ -30,7 +30,12 @@ export default function FeaturedPropsGrid({ props, onOpenStats }) {
       {/* Grid of Featured Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {featured.map((prop) => (
-          <PropCard key={prop.prop_id} prop={prop} onOpenStats={onOpenStats} />
+          <PropCard
+            key={prop.prop_id}
+            prop={prop}
+            onOpenStats={onOpenStats}
+            onOpenHeatmap={onOpenHeatmap}
+          />
         ))}
       </div>
     </section>

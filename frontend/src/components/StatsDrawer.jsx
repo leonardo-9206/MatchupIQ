@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
-import { X, Star, TrendingUp, Shield, BarChart3, BookmarkPlus, Check, ArrowRight, ExternalLink } from 'lucide-react';
+import React from 'react';
+import { X, Star, BarChart3, Shield, BookmarkPlus, Flame } from 'lucide-react';
+import Button from './common/Button.jsx';
 
-export default function StatsDrawer({ prop, isOpen, onClose }) {
-  const [savedToTracker, setSavedToTracker] = useState(false);
-
+export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAddBet }) {
   if (!isOpen || !prop) return null;
 
-  const handleSavePick = () => {
-    setSavedToTracker(true);
-    setTimeout(() => setSavedToTracker(false), 2500);
-  };
+  const isNfl = prop.sport_slug === 'nfl';
+  const hasHeatmap = isNfl && (prop.bet_type === 'rushing_yards' || prop.bet_type === 'receiving_yards' || prop.bet_type === 'passing_yards');
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -68,6 +65,32 @@ export default function StatsDrawer({ prop, isOpen, onClose }) {
           {/* Drawer Body (Scrollable) */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
             
+            {/* Tactical Heatmap Button directly in drawer */}
+            {hasHeatmap && onOpenHeatmap && (
+              <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-display text-sm font-bold text-sky-200">
+                      Mapa Táctico del Campo NFL
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Desglose de acarreos por carril y éxito en zonas
+                    </p>
+                  </div>
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    icon={Flame}
+                    onClick={() => {
+                      onOpenHeatmap(prop.player_id);
+                    }}
+                  >
+                    Ver Heatmap
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* 1. US Sportsbooks Comparative Breakdown */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -121,7 +144,7 @@ export default function StatsDrawer({ prop, isOpen, onClose }) {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 font-display">
                   <BarChart3 className="h-4 w-4 text-brand-cyan" />
-                  <span>Rendimiento Reciente (Últimos 5 Partidos)</span>
+                  <span>Historial Real (Últimos 5 Partidos)</span>
                 </div>
                 <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 font-mono">
                   {prop.streak_hits} Over
@@ -169,28 +192,17 @@ export default function StatsDrawer({ prop, isOpen, onClose }) {
 
           </div>
 
-          {/* Drawer Footer: Add to Bet Tracker */}
+          {/* Drawer Footer: Open Add Bet Modal */}
           <div className="border-t border-slate-800 p-5 bg-[#050811]">
-            <button
-              onClick={handleSavePick}
-              className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold transition-all shadow-md ${
-                savedToTracker
-                  ? 'bg-emerald-500 text-slate-950 font-black'
-                  : 'bg-gradient-to-r from-brand-cyan to-brand-teal text-slate-950 hover:opacity-90 shadow-glow-cyan'
-              }`}
+            <Button
+              variant="primary"
+              size="lg"
+              icon={BookmarkPlus}
+              onClick={() => onAddBet(prop)}
+              className="w-full justify-center"
             >
-              {savedToTracker ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>¡Guardado en tu Bet Tracker!</span>
-                </>
-              ) : (
-                <>
-                  <BookmarkPlus className="h-4 w-4" />
-                  <span>Agregar Pick a mi Bet Tracker</span>
-                </>
-              )}
-            </button>
+              <span>Agregar a mi Bet Tracker</span>
+            </Button>
             <p className="text-center text-[10px] text-slate-500 mt-2 font-mono">
               Registra cuota {prop.american_odds} con {prop.best_bookmaker}
             </p>

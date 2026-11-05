@@ -1,8 +1,11 @@
 import React from 'react';
-import { ArrowUpRight, Flame, BarChart2, Star, ShieldAlert } from 'lucide-react';
+import { ArrowUpRight, Flame, BarChart2, Star } from 'lucide-react';
+import Button from './common/Button.jsx';
 
-export default function PropCard({ prop, onOpenStats }) {
+export default function PropCard({ prop, onOpenStats, onOpenHeatmap }) {
   const isPositiveEdge = prop.calculated_edge > 0;
+  const isNfl = prop.sport_slug === 'nfl';
+  const hasHeatmap = isNfl && (prop.bet_type === 'rushing_yards' || prop.bet_type === 'receiving_yards' || prop.bet_type === 'passing_yards');
 
   return (
     <div className="group relative flex flex-col justify-between rounded-2xl border border-brand-cyan/25 bg-[#0D1527] p-5 shadow-glow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-cyan/50 hover:shadow-glow-cyan">
@@ -96,16 +99,31 @@ export default function PropCard({ prop, onOpenStats }) {
         )}
       </div>
 
-      {/* Footer Action Button: Stats & Odds Drawer */}
-      <div className="mt-4 pt-3 border-t border-slate-800/70">
-        <button
+      {/* Footer Action Buttons */}
+      <div className="mt-4 pt-3 border-t border-slate-800/70 flex flex-col sm:flex-row gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={BarChart2}
           onClick={() => onOpenStats(prop)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-cyan/40 bg-brand-cyan/10 px-4 py-2.5 text-xs font-bold text-brand-cyan hover:bg-brand-cyan hover:text-slate-950 transition-all shadow-sm group-hover:shadow-glow-cyan"
+          className="flex-1 justify-center"
         >
-          <BarChart2 className="h-4 w-4" />
-          <span>Stats & Odds en USA</span>
+          <span>Stats & Odds</span>
           <ArrowUpRight className="h-3.5 w-3.5" />
-        </button>
+        </Button>
+
+        {hasHeatmap && onOpenHeatmap && (
+          <Button
+            variant="accent"
+            size="sm"
+            icon={Flame}
+            onClick={() => onOpenHeatmap(prop.player_id)}
+            className="sm:w-auto px-2.5 justify-center"
+            title="Ver Mapa Táctico de Acarreos en el Campo NFL"
+          >
+            <span>Mapa Táctico</span>
+          </Button>
+        )}
       </div>
 
     </div>

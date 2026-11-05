@@ -1,7 +1,16 @@
 import React from 'react';
-import { Activity, ShieldCheck, Flame, Layers } from 'lucide-react';
+import { Activity, Layers, BookmarkCheck, LogIn, LogOut } from 'lucide-react';
+import Button from './common/Button.jsx';
 
-export default function Navbar({ activeTab, onSelectTab, onOpenHeatmap }) {
+export default function Navbar({
+  activeTab,
+  onSelectTab,
+  currentUser,
+  onOpenLogin,
+  onOpenRegister,
+  onLogout,
+  trackerBetsCount = 0,
+}) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070B16]/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -33,57 +42,90 @@ export default function Navbar({ activeTab, onSelectTab, onOpenHeatmap }) {
 
         {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 sm:gap-2">
-          <button
+          <Button
+            variant={activeTab === 'dashboard' ? 'primary' : 'ghost'}
+            size="sm"
+            icon={Activity}
             onClick={() => onSelectTab('dashboard')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-              activeTab === 'dashboard'
-                ? 'bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/40 shadow-glow-cyan'
-                : 'text-slate-400 hover:bg-surface-elevated hover:text-slate-200'
-            }`}
           >
-            <Activity className="h-3.5 w-3.5" />
             <span>Dashboard</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant={activeTab === 'catalog' ? 'primary' : 'ghost'}
+            size="sm"
+            icon={Layers}
             onClick={() => onSelectTab('catalog')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-              activeTab === 'catalog'
-                ? 'bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/40 shadow-glow-cyan'
-                : 'text-slate-400 hover:bg-surface-elevated hover:text-slate-200'
-            }`}
           >
-            <Layers className="h-3.5 w-3.5" />
             <span>Catálogo</span>
-          </button>
+          </Button>
 
-          {/* Heatmap Modal Trigger (Colaboración con Josh) */}
-          <button
-            onClick={onOpenHeatmap}
-            className="flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-500/20 hover:text-white transition-all"
+          {/* Bet Tracker Tab (Sprint 3) */}
+          <Button
+            variant={activeTab === 'tracker' ? 'primary' : 'ghost'}
+            size="sm"
+            icon={BookmarkCheck}
+            onClick={() => onSelectTab('tracker')}
+            className="relative"
           >
-            <Flame className="h-3.5 w-3.5 text-sky-400" />
-            <span className="hidden sm:inline">Mapa Táctico</span>
-            <span className="sm:hidden">Heatmap</span>
-          </button>
+            <span>Bet Tracker</span>
+            {trackerBetsCount > 0 && (
+              <span className="ml-1 rounded-full bg-emerald-500/20 text-edge-positive px-1.5 py-0.2 text-[10px] font-mono font-bold">
+                {trackerBetsCount}
+              </span>
+            )}
+          </Button>
         </nav>
 
-        {/* User Pill / Status */}
-        <div className="flex items-center gap-3">
+        {/* Authentication State Section */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-800 bg-surface-1 px-3 py-1 text-xs font-mono text-slate-400">
             <span className="h-2 w-2 rounded-full bg-edge-positive" />
             <span>US Odds Live</span>
           </div>
 
-          <div className="flex items-center gap-2.5 rounded-full border border-slate-700/80 bg-surface-card px-3 py-1.5 text-xs font-medium">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-brand-cyan to-brand-blue text-[11px] font-bold text-slate-900 font-display">
-              AV
+          {currentUser ? (
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 rounded-full border border-slate-700/80 bg-surface-card px-3 py-1 text-xs font-medium">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-brand-cyan to-brand-blue text-[11px] font-bold text-slate-950 font-display uppercase">
+                  {currentUser.full_name ? currentUser.full_name.charAt(0) : 'U'}
+                </div>
+                <div className="hidden sm:block text-left leading-tight">
+                  <span className="block font-semibold text-slate-200">{currentUser.full_name || currentUser.email}</span>
+                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role || 'Usuario'}</span>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={LogOut}
+                onClick={onLogout}
+                className="text-xs text-slate-400 hover:text-red-400"
+                title="Cerrar Sesión"
+              >
+                <span className="hidden sm:inline">Salir</span>
+              </Button>
             </div>
-            <div className="hidden sm:block text-left leading-tight">
-              <span className="block font-semibold text-slate-200">Antonio V.</span>
-              <span className="block text-[10px] text-brand-cyan">Lead Frontend</span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={LogIn}
+                onClick={onOpenLogin}
+              >
+                <span>Ingresar</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onOpenRegister}
+              >
+                <span>Registro</span>
+              </Button>
             </div>
-          </div>
+          )}
         </div>
 
       </div>
