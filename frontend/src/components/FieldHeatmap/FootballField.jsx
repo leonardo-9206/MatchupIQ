@@ -5,6 +5,8 @@ export const YARD = 10;
 export const FIELD_LENGTH = 120 * YARD;
 export const FIELD_WIDTH = 53.3 * YARD;
 export const END_ZONE = 10 * YARD;
+// Tactical views snap the ball from the offense's own 25-yard line (absolute yard 35)
+export const LINE_OF_SCRIMMAGE_YARD = 10 + 25;
 
 // Hash marks in the NFL sit 70'9" from each sideline (~23.58 yd).
 const HASH_OFFSET = 23.58 * YARD;
@@ -15,9 +17,9 @@ export const yardToY = (absYard) => FIELD_LENGTH - absYard * YARD;
 
 /**
  * Draws the whole field but only shows the window between fromYard and toYard (absolute yards),
- * so the parent can zoom into the area around the line of scrimmage.
+ * and between fromX and toX (yards from the left sideline), so the parent can zoom into the play.
  */
-export default function FootballField({ fromYard = 0, toYard = 120, children }) {
+export default function FootballField({ fromYard = 0, toYard = 120, fromX = 0, toX = FIELD_WIDTH / YARD, children }) {
   const yardLines = [];
   for (let yd = 5; yd <= 95; yd += 5) {
     yardLines.push(yardToY(10 + yd));
@@ -40,7 +42,7 @@ export default function FootballField({ fromYard = 0, toYard = 120, children }) 
 
   return (
     <svg
-      viewBox={`0 ${viewTop} ${FIELD_WIDTH} ${viewHeight}`}
+      viewBox={`${fromX * YARD} ${viewTop} ${(toX - fromX) * YARD} ${viewHeight}`}
       className="h-auto w-full rounded-xl"
       role="img"
       aria-label="Football field heatmap"

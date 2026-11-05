@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import FootballField, { YARD, FIELD_WIDTH, yardToY } from './FootballField.jsx';
-import { heatColor, normalize, HEAT_STOPS } from './heatScale.js';
+import FootballField, { YARD, FIELD_WIDTH, LINE_OF_SCRIMMAGE_YARD, yardToY } from './FootballField.jsx';
+import { heatColor, normalize } from './heatScale.js';
 import usePlayerHeatmap from '../../hooks/usePlayerHeatmap.js';
+import { SourceBadge, HeatLegend, TacticsPlaceholder } from '../Tactics/TacticsUI.jsx';
 
 // Lanes ordered from the offense's left to its right.
 // The offense attacks upward, so its left side is also the left of the screen (view from behind the QB).
@@ -20,8 +21,7 @@ export const METRICS = {
   yards_per_attempt: { label: 'Yds / Att', format: (v) => v.toFixed(2) },
 };
 
-// Absolute yards (0 = back of the offense's end zone). The ball is snapped from the offense's own 25.
-const LINE_OF_SCRIMMAGE_YARD = 10 + 25;
+// Absolute yards (0 = back of the offense's end zone)
 const LANE_YARDS = 35;
 // Visible window: a few yards behind the line (for the lane labels) up to a bit past the end of the lanes
 const VIEW_FROM_YARD = LINE_OF_SCRIMMAGE_YARD - 8;
@@ -62,11 +62,8 @@ export default function FieldHeatmap({ playerId = null, data = null, metric = 's
 
   const stats = useMemo(() => buildZoneStats(rows), [rows]);
 
-  if (loading && rows.length === 0) {
-    return <p className="py-16 text-center text-sm text-slate-400">Loading heatmap…</p>;
-  }
   if (rows.length === 0) {
-    return <p className="py-16 text-center text-sm text-slate-400">No heatmap data for this player.</p>;
+    return <TacticsPlaceholder loading={loading} />;
   }
 
   const values = ZONES.map((z) => stats[z.key]?.[metric] ?? 0);
@@ -169,25 +166,9 @@ export default function FieldHeatmap({ playerId = null, data = null, metric = 's
       </div>
 
       <div className="flex w-full flex-col gap-4 md:max-w-xs">
-        {!data && fetched.source && (
-          <span
-            className={`self-start rounded-full px-3 py-1 text-xs font-semibold ${
-              fetched.source === 'backend' ? 'bg-emerald-500/10 text-[#00E676]' : 'bg-amber-500/10 text-[#FF9100]'
-            }`}
-          >
-            {fetched.source === 'backend' ? 'Live data · /api/tactics' : 'Mock data · backend offline'}
-          </span>
-        )}
+        {!data && <SourceBadge source={fetched.source} />}
 
-        {/* Legend */}
-        <div>
-          <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">{METRICS[metric].label}</p>
-          <div className="h-3 rounded-full" style={{ background: `linear-gradient(to right, ${HEAT_STOPS.join(', ')})` }} />
-          <div className="mt-1 flex justify-between text-xs text-slate-400">
-            <span>{METRICS[metric].format(min)}</span>
-            <span>{METRICS[metric].format(max)}</span>
-          </div>
-        </div>
+        <HeatLegend label={METRICS[metric].label} min={METRICS[metric].format(min)} max={METRICS[metric].format(max)} />
 
         {/* Zone detail */}
         <div className="min-h-[88px] rounded-xl border border-slate-800 bg-surface-2 p-4">
