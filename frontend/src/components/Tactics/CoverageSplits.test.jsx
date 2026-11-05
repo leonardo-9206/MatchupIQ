@@ -48,6 +48,38 @@ describe('CoverageSplits', () => {
     expect(screen.getByText('Live data · /api/tactics')).toBeInTheDocument();
   });
 
+  it('displays HU-11 matchup projection metrics when provided in backend summary', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: 'success',
+          data: {
+            player: { player_id: 2, name: 'Travis Kelce', position: 'TE' },
+            splits: [
+              { coverage_type: 'man', targets: 35, receptions: 26, catch_rate: 74.29 },
+              { coverage_type: 'zone', targets: 58, receptions: 46, catch_rate: 79.31 },
+            ],
+            summary: {
+              preferred_scheme: 'zone',
+              opponent_zone_rate: 70,
+              projected_catch_rate: 77.8,
+              tactical_advantage: 'FAVORABLE',
+              tactical_edge_boost: 2.35,
+            },
+          },
+        }),
+      })
+    );
+    render(<CoverageSplits playerId={2} />);
+
+    const summaryBox = await screen.findByTestId('coverage-projection-summary');
+    expect(within(summaryBox).getByText('FAVORABLE')).toBeInTheDocument();
+    expect(within(summaryBox).getByText('77.8%')).toBeInTheDocument();
+    expect(within(summaryBox).getByText('+2.35%')).toBeInTheDocument();
+  });
+
   it('shows the empty state for players without coverage data', async () => {
     offline();
     render(<CoverageSplits playerId={999} />);

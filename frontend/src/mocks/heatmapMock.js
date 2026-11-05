@@ -6,6 +6,7 @@
 export const mockPlayers = [
   { player_id: 3, name: 'Isiah Pacheco', position: 'RB', team: 'KC' },
   { player_id: 4, name: 'Christian McCaffrey', position: 'RB', team: 'SF' },
+  { player_id: 2, name: 'Travis Kelce', position: 'TE', team: 'KC' },
 ];
 
 export const mockHeatmaps = {
