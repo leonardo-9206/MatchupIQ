@@ -5,8 +5,10 @@ import FeaturedPropsGrid from './components/FeaturedPropsGrid.jsx';
 import PropsTableList from './components/PropsTableList.jsx';
 import StatsDrawer from './components/StatsDrawer.jsx';
 import TacticalHeatmapModal from './components/TacticalHeatmapModal.jsx';
+import AuthModal from './components/AuthModal.jsx';
 import { getProps } from './services/propsService.js';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { checkSession, logoutUser } from './services/authService.js';
+import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [selectedSport, setSelectedSport] = useState('all');
@@ -17,7 +19,24 @@ export default function App() {
   const [selectedProp, setSelectedProp] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
+  const [heatmapPlayerId, setHeatmapPlayerId] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
+
+  // Verify initial user session
+  useEffect(() => {
+    async function verifyUser() {
+      const res = await checkSession();
+      if (res.isAuthenticated) {
+        setCurrentUser(res.user);
+      }
+    }
+    verifyUser();
+  }, []);
 
   // Load props from asynchronous service (Fetch API)
   useEffect(() => {
@@ -67,6 +86,16 @@ export default function App() {
     setIsDrawerOpen(false);
   };
 
+  const handleOpenHeatmap = (playerId) => {
+    setHeatmapPlayerId(playerId);
+    setIsHeatmapOpen(true);
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col justify-between selection:bg-brand-cyan/20 selection:text-brand-cyan">
       
@@ -75,7 +104,10 @@ export default function App() {
         <Navbar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
-          onOpenHeatmap={() => setIsHeatmapOpen(true)}
+          currentUser={currentUser}
+          onOpenLogin={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
+          onOpenRegister={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
+          onLogout={handleLogout}
         />
 
         {/* Hero & Real-time Filter Bar */}
@@ -101,6 +133,7 @@ export default function App() {
               <FeaturedPropsGrid
                 props={filteredProps}
                 onOpenStats={handleOpenStats}
+                onOpenHeatmap={handleOpenHeatmap}
               />
             )}
 
@@ -119,29 +152,38 @@ export default function App() {
         prop={selectedProp}
         isOpen={isDrawerOpen}
         onClose={handleCloseStats}
+        onOpenHeatmap={handleOpenHeatmap}
       />
 
-      {/* Tactical NFL Field Heatmap Modal */}
+      {/* Tactical NFL Field Heatmap Modal directly bound to player */}
       <TacticalHeatmapModal
         isOpen={isHeatmapOpen}
+        selectedPlayerId={heatmapPlayerId}
         onClose={() => setIsHeatmapOpen(false)}
       />
 
-      {/* Modern Minimal Footer */}
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialMode={authModalMode}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={(user) => setCurrentUser(user)}
+      />
+
+      {/* Institutional Formal Footer */}
       <footer className="mt-16 border-t border-slate-800/80 bg-[#070B16] py-8 text-center text-xs text-slate-400">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src="/logo_matchupiq_app.png" alt="MatchupIQ" className="h-6 w-auto opacity-75" />
             <span className="font-display font-bold text-white tracking-wide">MatchupIQ</span>
-            <span className="text-[11px] text-slate-400">— Sprint 2 Frontend Delivery</span>
           </div>
 
           <div className="text-[11px] font-mono text-slate-400">
-            Lead Frontend & UI/UX: <strong className="text-slate-300">Carlos Antonio Villaseñor García</strong> (ID: 441641)
+            MatchupIQ © 2026 — ISC 5-A (UAA)
           </div>
 
           <div className="text-[11px] text-slate-400">
-            ISC 5-A • Programación de Sistemas Web
+            Programación de Sistemas Web
           </div>
         </div>
       </footer>

@@ -1,19 +1,24 @@
-import React, { useState } from 'react';
-import { X, Flame, Info, Loader2, Database, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Flame, Info, Loader2, Database } from 'lucide-react';
 import FieldHeatmap, { METRICS } from './FieldHeatmap/FieldHeatmap.jsx';
 import usePlayerHeatmap from '../hooks/usePlayerHeatmap.js';
 import { mockPlayers } from '../mocks/heatmapMock.js';
 
-export default function TacticalHeatmapModal({ isOpen, onClose }) {
-  const [playerId, setPlayerId] = useState(mockPlayers[0]?.player_id ?? 1);
+export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId }) {
+  const [playerId, setPlayerId] = useState(selectedPlayerId ?? mockPlayers[0]?.player_id ?? 1);
   const [metric, setMetric] = useState('attempts');
 
+  // Keep playerId in sync whenever selectedPlayerId changes
+  useEffect(() => {
+    if (selectedPlayerId) {
+      setPlayerId(selectedPlayerId);
+    }
+  }, [selectedPlayerId]);
+
   // Official hook by Josh connected to Joao's PHP endpoint (/api/tactics/heatmap.php)
-  const { zones, loading, source, player: apiPlayer, summary } = usePlayerHeatmap(playerId);
+  const { zones, loading, source, player: apiPlayer } = usePlayerHeatmap(playerId);
 
   if (!isOpen) return null;
-
-  const currentPlayer = apiPlayer || mockPlayers.find((p) => p.player_id === playerId);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -122,7 +127,7 @@ export default function TacticalHeatmapModal({ isOpen, onClose }) {
           <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400 font-mono">
             <Info className="h-4 w-4 text-sky-400" />
             <span>
-              Visualización basada en coordenadas oficiales de jugadas de la NFL (Carriles ofensivos: Extremo izquierdo a extremo derecho).
+              Visualización basada en coordenadas de jugadas de la NFL.
             </span>
           </div>
 
