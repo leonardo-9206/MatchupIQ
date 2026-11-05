@@ -2,6 +2,7 @@
 /**
  * Database Connection Service (Singleton Pattern)
  * Provides a secure, persistent PDO connection to MySQL.
+ * Implements Fail-Fast environment validation for critical database variables.
  */
 
 class Database
@@ -13,10 +14,19 @@ class Database
     {
         $this->loadEnvironment();
 
-        $host = getenv('DB_HOST') ?: '127.0.0.1';
+        // Fail-Fast validation: Ensure critical database parameters exist in environment
+        $requiredVars = ['DB_HOST', 'DB_NAME', 'DB_USER'];
+        foreach ($requiredVars as $var) {
+            $val = getenv($var);
+            if ($val === false || trim($val) === '') {
+                throw new RuntimeException("Error crítico: Configuración de base de datos incompleta en .env");
+            }
+        }
+
+        $host = getenv('DB_HOST');
         $port = getenv('DB_PORT') ?: '3306';
-        $dbName = getenv('DB_NAME') ?: 'matchupiq_db';
-        $user = getenv('DB_USER') ?: 'root';
+        $dbName = getenv('DB_NAME');
+        $user = getenv('DB_USER');
         $password = getenv('DB_PASS') !== false ? getenv('DB_PASS') : '';
         $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
 
@@ -90,7 +100,7 @@ class Database
                 $key = trim($key);
                 $value = trim($value, " \t\n\r\0\x0B\"'");
 
-                if (!getenv($key)) {
+                if (getenv($key) === false) {
                     putenv("{$key}={$value}");
                     $_ENV[$key] = $value;
                     $_SERVER[$key] = $value;
