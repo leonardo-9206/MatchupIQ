@@ -19,7 +19,8 @@ class AdminController
     }
 
     /**
-     * Forces an on-demand synchronization with The Odds API and updates local MySQL cache.
+     * Forces an on-demand synchronization with The Odds API and updates local MySQL cache
+     * as well as the relational `props` table with recalculated Value Edge metrics.
      * Restricted strictly to administrators to prevent depletion of monthly API quotas.
      * Route: POST /api/admin/odds/refresh.php
      */
@@ -46,7 +47,7 @@ class AdminController
         $startTime = microtime(true);
 
         try {
-            // Force refresh bypasses local cache and hits external API via cURL
+            // Force refresh bypasses local cache, hits external API via cURL, and syncs relational props
             $result = $this->oddsService->getOdds($sport, $markets, true);
 
             $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
@@ -60,13 +61,22 @@ class AdminController
                 );
             }
 
-            Response::success('The Odds API cache synchronized successfully.', [
+            $propsSynced = $result['props_synced'] ?? [
+                'updated' => 0,
+                'inserted' => 0,
+                'events_processed' => 0
+            ];
+
+            Response::success('The Odds API cache and relational props synchronized successfully.', [
                 'triggered_by'       => $adminUser['email'],
                 'benchmark_ms'       => $executionTimeMs,
                 'sport_key'          => $sport,
                 'markets'            => $markets,
                 'requests_remaining' => $result['requests_remaining'] ?? null,
                 'cached_records'     => $result['count'] ?? 0,
+                'props_updated'      => $propsSynced['updated'] ?? 0,
+                'props_inserted'     => $propsSynced['inserted'] ?? 0,
+                'events_processed'   => $propsSynced['events_processed'] ?? 0,
                 'expires_at'         => date('Y-m-d H:i:s', time() + 900)
             ], 200);
 
