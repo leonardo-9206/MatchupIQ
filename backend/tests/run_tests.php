@@ -7,7 +7,7 @@
  * 3. Server-side Input Validation (400 Bad Request, 422 Unprocessable)
  * 4. Secure Authentication Flow (Register 201, Login 200, Duplicate 409, Logout 200)
  * 5. Persistent Props Data Flow & Value Edge Calculation
- * 6. NFL Tactical Analytics (Heatmaps & Coverage Splits)
+ * 6. NFL Tactical Analytics (Heatmaps, Coverage Splits & Route Trees)
  * 7. Bet Tracker Full CRUD & OWASP BOLA Access Control
  *
  * Usage:
@@ -196,9 +196,9 @@ class TestRunner
         }
 
         // ==========================================
-        // Suite 6: NFL Tactical Analytics (Heatmaps & Coverage Splits)
+        // Suite 6: NFL Tactical Analytics (Heatmaps, Coverage Splits & Route Trees)
         // ==========================================
-        $this->section("Suite 6: NFL Tactical Analytics (Heatmaps & Coverage Splits)");
+        $this->section("Suite 6: NFL Tactical Analytics (Heatmaps, Coverage Splits & Route Trees)");
 
         $missingPlayerHeatmap = $this->request('GET', '/api/tactics/heatmap.php');
         $this->assert("GET /api/tactics/heatmap.php without player_id returns 400 Bad Request", $missingPlayerHeatmap['code'] === 400);
@@ -209,9 +209,12 @@ class TestRunner
         $missingPlayerCoverage = $this->request('GET', '/api/tactics/coverage.php');
         $this->assert("GET /api/tactics/coverage.php without player_id returns 400 Bad Request", $missingPlayerCoverage['code'] === 400);
 
+        $missingPlayerRoutes = $this->request('GET', '/api/tactics/routes.php');
+        $this->assert("GET /api/tactics/routes.php without player_id returns 400 Bad Request", $missingPlayerRoutes['code'] === 400);
+
         $heatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=3');
         if ($heatmap['code'] === 500 && str_contains(json_encode($heatmap), 'Database connection failed')) {
-            $this->skip("Tactical heatmap & coverage persistence tests skipped: MySQL database is not currently running.");
+            $this->skip("Tactical heatmap, coverage & route tree persistence tests skipped: MySQL database is not currently running.");
         } else {
             $this->assert("GET /api/tactics/heatmap.php?player_id=3 returns 200 OK", $heatmap['code'] === 200);
             $zones = $heatmap['json']['data']['zones'] ?? [];
@@ -222,15 +225,25 @@ class TestRunner
             $notFoundHeatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=999999');
             $this->assert("GET /api/tactics/heatmap.php?player_id=999999 returns 404 Not Found", $notFoundHeatmap['code'] === 404);
 
-            $coverage = $this->request('GET', '/api/tactics/coverage.php?player_id=2');
-            $this->assert("GET /api/tactics/coverage.php?player_id=2 returns 200 OK", $coverage['code'] === 200);
+            $coverage = $this->request('GET', '/api/tactics/coverage.php?player_id=2&zone_rate=70');
+            $this->assert("GET /api/tactics/coverage.php?player_id=2&zone_rate=70 returns 200 OK", $coverage['code'] === 200);
             $splits = $coverage['json']['data']['splits'] ?? [];
             $schemes = is_array($splits) ? array_column($splits, 'coverage_type') : [];
             $this->assert("Coverage response contains both 'man' and 'zone' splits", 
                 in_array('man', $schemes, true) && in_array('zone', $schemes, true));
+            $covSummary = $coverage['json']['data']['summary'] ?? [];
+            $this->assert("Coverage summary projects FAVORABLE advantage and tactical_edge_boost for Kelce vs 70% Zone", 
+                ($covSummary['tactical_advantage'] ?? '') === 'FAVORABLE'
+                && isset($covSummary['projected_catch_rate'], $covSummary['tactical_edge_boost']));
 
             $notFoundCoverage = $this->request('GET', '/api/tactics/coverage.php?player_id=999999');
             $this->assert("GET /api/tactics/coverage.php?player_id=999999 returns 404 Not Found", $notFoundCoverage['code'] === 404);
+
+            $routes = $this->request('GET', '/api/tactics/routes.php?player_id=2');
+            $this->assert("GET /api/tactics/routes.php?player_id=2 returns 200 OK", $routes['code'] === 200);
+            $routeList = $routes['json']['data']['routes'] ?? [];
+            $this->assert("Route tree response contains NextGenStats routes array and summary", 
+                is_array($routeList) && count($routeList) > 0 && isset($routes['json']['data']['summary']['primary_route']));
         }
 
         // ==========================================
