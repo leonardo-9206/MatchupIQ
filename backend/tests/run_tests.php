@@ -76,6 +76,12 @@ class TestRunner
         $invalidAdminMethod = $this->request('GET', '/api/admin/odds/refresh.php');
         $this->assert("GET /api/admin/odds/refresh.php is blocked with 405 Method Not Allowed", $invalidAdminMethod['code'] === 405);
 
+        $unauthEspnSync = $this->request('POST', '/api/admin/espn/sync.php');
+        $this->assert("POST /api/admin/espn/sync.php without session is rejected with 401 Unauthorized", $unauthEspnSync['code'] === 401);
+
+        $invalidEspnMethod = $this->request('GET', '/api/admin/espn/sync.php');
+        $this->assert("GET /api/admin/espn/sync.php is blocked with 405 Method Not Allowed", $invalidEspnMethod['code'] === 405);
+
         // ==========================================
         // Suite 3: Input Validation & Sanitization
         // ==========================================
@@ -151,10 +157,14 @@ class TestRunner
             $this->assert("Session accurately identifies authenticated user", 
                 ($authMe['json']['data']['user']['email'] ?? '') === $uniqueEmail);
 
-            // RBAC Verification: Regular user is blocked from admin endpoint
+            // RBAC Verification: Regular user is blocked from admin endpoints
             $userAdminForbidden = $this->request('POST', '/api/admin/odds/refresh.php', null, true);
             $this->assert("RBAC: Regular authenticated user accessing /api/admin/odds/refresh.php is blocked with 403 Forbidden", 
                 $userAdminForbidden['code'] === 403);
+
+            $userEspnForbidden = $this->request('POST', '/api/admin/espn/sync.php', null, true);
+            $this->assert("RBAC: Regular authenticated user accessing /api/admin/espn/sync.php is blocked with 403 Forbidden", 
+                $userEspnForbidden['code'] === 403);
 
             // Logout
             $logout = $this->request('POST', '/api/auth/logout.php', null, true);
@@ -238,6 +248,40 @@ class TestRunner
             $syncedPropCheck = $this->request('GET', '/api/props/show.php?id=1');
             $this->assert("GET /api/props/show.php?id=1 reflects synchronized line threshold (275.5)",
                 (float) ($syncedPropCheck['json']['data']['prop']['line_over'] ?? 0) === 275.5);
+
+            // ESPN API Gamelog Ingestion Verification
+            require_once __DIR__ . '/../services/EspnApiService.php';
+            $espnService = new EspnApiService();
+            $mockGamelog = [
+                'names' => ['passingAttempts', 'passingYards', 'passingTouchdowns'],
+                'events' => [
+                    '99901' => [
+                        'gameDate' => '2026-11-04T18:00:00Z',
+                        'atVs'     => 'vs',
+                        'opponent' => ['abbreviation' => 'LVR']
+                    ]
+                ],
+                'seasonTypes' => [
+                    [
+                        'categories' => [
+                            [
+                                'events' => [
+                                    [
+                                        'eventId' => '99901',
+                                        'stats'   => ['35', '310', '3']
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+            $parsedLogs = $espnService->parseRecentLogs($mockGamelog, 'passingYards', 'passing_yards', 1);
+            $this->assert("EspnApiService::parseRecentLogs correctly extracts opponent and stat value",
+                count($parsedLogs) === 1 && ($parsedLogs[0]['stat_value'] ?? 0) === 310.0 && ($parsedLogs[0]['opponent_abbr'] ?? '') === 'LVR');
+
+            $ingestedCount = $espnService->ingestLogsForPlayer(1, $parsedLogs);
+            $this->assert("EspnApiService::ingestLogsForPlayer stores record in player_game_logs", $ingestedCount === 1);
         }
 
         // ==========================================
