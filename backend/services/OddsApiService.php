@@ -338,6 +338,18 @@ class OddsApiService
                                 continue;
                             }
 
+                            // Enforce strict position-to-bet_type standardization (QB = passing, RB = rushing, WR/TE = receiving)
+                            $playerPos = strtoupper(trim($playerRow['position'] ?? ''));
+                            $expectedBetType = match ($playerPos) {
+                                'QB'       => 'passing_yards',
+                                'RB'       => 'rushing_yards',
+                                'WR', 'TE' => 'receiving_yards',
+                                default    => null
+                            };
+                            if ($expectedBetType !== null && $betType !== $expectedBetType) {
+                                continue;
+                            }
+
                             $playerId = (int) $playerRow['player_id'];
                             $statAvg = (float) $playerRow['stat_average'];
                             $playerTeamId = (int) $playerRow['team_id'];
