@@ -33,8 +33,8 @@ describe('getPlayerHeatmap', () => {
     expect(result.zones).toEqual(mockHeatmaps[3]);
   });
 
-  it('falls back to the mock when the API returns an error status', async () => {
-    respondWith(404, { status: 'error', message: 'Player not found.' });
+  it('falls back to the mock when the API has a server error (5xx)', async () => {
+    respondWith(500, { status: 'error', message: 'Database connection failed.' });
 
     const result = await getPlayerHeatmap(4);
 
@@ -42,8 +42,17 @@ describe('getPlayerHeatmap', () => {
     expect(result.zones).toEqual(mockHeatmaps[4]);
   });
 
-  it('returns an empty list when neither backend nor mock have the player', async () => {
-    respondWith(404, { status: 'error', message: 'Player not found.' });
+  it('does not use mock rows when the backend answers that the player has no data', async () => {
+    respondWith(404, { status: 'error', message: 'No tactical heatmap data found for the specified player.' });
+
+    // Player 3 exists in the mock, but the real backend says there is nothing for them
+    const result = await getPlayerHeatmap(3);
+
+    expect(result).toMatchObject({ source: 'backend', zones: [] });
+  });
+
+  it('returns an empty list when the backend is offline and the mock lacks the player', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
     const result = await getPlayerHeatmap(999);
 
@@ -70,8 +79,18 @@ describe('getPlayerCoverage', () => {
 });
 
 describe('getPlayerRouteTree', () => {
-  it('uses the route mock while the routes endpoint does not exist', async () => {
-    respondWith(404, {});
+  it('reads data.routes from /api/tactics/routes.php', async () => {
+    const routes = [{ route_type: 'slant', targets: 4, receptions: 3, yards_gained: 30, catch_rate: 75 }];
+    respondWith(200, { status: 'success', data: { player: {}, routes, summary: { primary_route: 'slant' } } });
+
+    const result = await getPlayerRouteTree(2);
+
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/tactics/routes.php?player_id=2'), expect.any(Object));
+    expect(result).toMatchObject({ source: 'backend', routes });
+  });
+
+  it('falls back to the route mock when the backend is offline', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
     expect(await getPlayerRouteTree(2)).toMatchObject({ source: 'mock', routes: mockRouteTrees[2] });
   });
