@@ -106,6 +106,22 @@ export default function App() {
     });
   }, [propsData, searchQuery]);
 
+  // NFL athletes that appear in the loaded props, for the tactical modal's player selector
+  const tacticalPlayers = useMemo(() => {
+    const byId = new Map();
+    for (const p of propsData) {
+      if (p.sport_slug === 'nfl' && !byId.has(p.player_id)) {
+        byId.set(p.player_id, {
+          player_id: p.player_id,
+          name: p.player_name,
+          position: p.player_position,
+          team: p.team_abbreviation,
+        });
+      }
+    }
+    return [...byId.values()];
+  }, [propsData]);
+
   const handleOpenStats = (prop) => {
     setSelectedProp(prop);
     setIsDrawerOpen(true);
@@ -246,6 +262,7 @@ export default function App() {
       <TacticalHeatmapModal
         isOpen={isHeatmapOpen}
         selectedPlayerId={heatmapPlayerId}
+        players={tacticalPlayers}
         onClose={() => setIsHeatmapOpen(false)}
       />
 

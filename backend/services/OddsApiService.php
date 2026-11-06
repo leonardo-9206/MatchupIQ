@@ -233,6 +233,50 @@ class OddsApiService
                 $gameRow = $fuzzyStmt->fetch();
             }
 
+            // Dynamic schedule sync: if game not found in calendar, insert it from real event payload
+            if (!$gameRow) {
+                $teamLookupSql = "SELECT team_id, defensive_rank FROM teams 
+                                  WHERE LOWER(name) = LOWER(:tname) OR LOWER(abbreviation) = LOWER(:tabbr) 
+                                  LIMIT 1";
+                $tLookupStmt = $this->db->prepare($teamLookupSql);
+
+                $tLookupStmt->execute([':tname' => $homeTeam, ':tabbr' => $homeTeam]);
+                $homeTeamRow = $tLookupStmt->fetch();
+
+                $tLookupStmt->execute([':tname' => $awayTeam, ':tabbr' => $awayTeam]);
+                $awayTeamRow = $tLookupStmt->fetch();
+
+                if ($homeTeamRow && $awayTeamRow) {
+                    $homeTeamId = (int) $homeTeamRow['team_id'];
+                    $awayTeamId = (int) $awayTeamRow['team_id'];
+                    $homeDefRank = (int) $homeTeamRow['defensive_rank'];
+                    $awayDefRank = (int) $awayTeamRow['defensive_rank'];
+
+                    $gameDateRaw = $event['commence_time'] ?? '';
+                    $gameDate = strlen($gameDateRaw) >= 19 
+                        ? str_replace(['T', 'Z'], [' ', ''], substr($gameDateRaw, 0, 19)) 
+                        : date('Y-m-d H:i:s', time() + 86400);
+
+                    $insertGameSql = "INSERT INTO games (sport_id, home_team_id, away_team_id, game_date) 
+                                      VALUES (1, :home_id, :away_id, :gdate)";
+                    $insertGameStmt = $this->db->prepare($insertGameSql);
+                    $insertGameStmt->execute([
+                        ':home_id' => $homeTeamId,
+                        ':away_id' => $awayTeamId,
+                        ':gdate'   => $gameDate
+                    ]);
+                    $gameId = (int) $this->db->lastInsertId();
+
+                    $gameRow = [
+                        'game_id'       => $gameId,
+                        'home_team_id'  => $homeTeamId,
+                        'away_team_id'  => $awayTeamId,
+                        'home_def_rank' => $homeDefRank,
+                        'away_def_rank' => $awayDefRank
+                    ];
+                }
+            }
+
             if (!$gameRow) {
                 continue;
             }

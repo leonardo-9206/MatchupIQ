@@ -99,7 +99,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onAu
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Carlos Villaseñor"
+                  placeholder="Juan Pérez"
                   className="w-full rounded-xl border border-slate-700 bg-surface-1 py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan"
                 />
               </div>
@@ -117,7 +117,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onAu
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="usuario@matchupiq.com"
+                placeholder="ejemplo@correo.com"
                 className="w-full rounded-xl border border-slate-700 bg-surface-1 py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan"
               />
             </div>
