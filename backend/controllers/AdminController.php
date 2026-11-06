@@ -52,6 +52,7 @@ class AdminController
         try {
             // Force refresh bypasses local cache, hits external API via cURL, and syncs relational props
             $result = $this->oddsService->getOdds($sport, $markets, true);
+            $playerPropsSync = $this->oddsService->syncAllLivePlayerProps($sport);
 
             $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
@@ -64,10 +65,10 @@ class AdminController
                 );
             }
 
-            $propsSynced = $result['props_synced'] ?? [
-                'updated' => 0,
-                'inserted' => 0,
-                'events_processed' => 0
+            $propsSynced = [
+                'updated'          => ($result['props_synced']['updated'] ?? 0) + $playerPropsSync['updated'],
+                'inserted'         => ($result['props_synced']['inserted'] ?? 0) + $playerPropsSync['inserted'],
+                'events_processed' => max($result['props_synced']['events_processed'] ?? 0, $playerPropsSync['events_processed'])
             ];
 
             Response::success('The Odds API cache and relational props synchronized successfully.', [

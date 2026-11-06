@@ -418,6 +418,54 @@ class OddsApiService
     /**
      * Resolves bookmaker ID by matching existing names or inserting a new bookmaker.
      */
+
+    /**
+     * Synchronizes live player props (rushing, passing, receiving yards) for upcoming games.
+     * Hits event odds endpoints on The Odds API and updates relational props.
+     */
+    public function syncAllLivePlayerProps(string $sportKey = 'americanfootball_nfl'): array
+    {
+        $eventsUrl = "{$this->baseUrl}/sports/{$sportKey}/events?apiKey={$this->apiKey}";
+        $eventsRes = $this->executeCurl($eventsUrl);
+
+        if (!$eventsRes['success'] || !is_array($eventsRes['data'])) {
+            return ['updated' => 0, 'inserted' => 0, 'events_processed' => 0];
+        }
+
+        $events = $eventsRes['data'];
+        $now = time();
+        $targetWindow = 86400 * 7; // Next 7 days
+        $markets = 'player_rush_yds,player_pass_yds,player_reception_yds';
+
+        $totalUpdated = 0;
+        $totalInserted = 0;
+        $eventsProcessed = 0;
+
+        foreach ($events as $event) {
+            $commenceTime = strtotime($event['commence_time'] ?? '');
+            if ($commenceTime < $now - 3600 || $commenceTime > $now + $targetWindow) {
+                continue;
+            }
+
+            $eventId = $event['id'];
+            $propUrl = "{$this->baseUrl}/sports/{$sportKey}/events/{$eventId}/odds?apiKey={$this->apiKey}&regions=us&markets={$markets}";
+            $propRes = $this->executeCurl($propUrl);
+
+            if ($propRes['success'] && is_array($propRes['data'])) {
+                $syncStats = $this->syncOddsToProps([$propRes['data']]);
+                $totalUpdated += $syncStats['updated'];
+                $totalInserted += $syncStats['inserted'];
+                $eventsProcessed++;
+            }
+        }
+
+        return [
+            'updated'          => $totalUpdated,
+            'inserted'         => $totalInserted,
+            'events_processed' => $eventsProcessed
+        ];
+    }
+
     private function resolveBookmakerId(string $name): int
     {
         $stmt = $this->db->prepare("SELECT bookmaker_id FROM bookmakers WHERE LOWER(name) = LOWER(:name) LIMIT 1");
@@ -494,20 +542,20 @@ class OddsApiService
     ): string {
         $checkStmt = $this->db->prepare("SELECT prop_id FROM props 
             WHERE player_id = :player_id 
-              AND bookmaker_id = :bookmaker_id 
-              AND game_id = :game_id 
               AND bet_type = :bet_type 
+            ORDER BY (bookmaker_id = :bookmaker_id) DESC, prop_id ASC
             LIMIT 1");
         $checkStmt->execute([
             ':player_id'    => $playerId,
-            ':bookmaker_id' => $bookmakerId,
-            ':game_id'      => $gameId,
-            ':bet_type'     => $betType
+            ':bet_type'     => $betType,
+            ':bookmaker_id' => $bookmakerId
         ]);
         $existing = $checkStmt->fetch();
 
         if ($existing) {
             $update = $this->db->prepare("UPDATE props SET 
+                bookmaker_id = :bookmaker_id,
+                game_id = :game_id,
                 line_over = :line_over,
                 odds_over = :odds_over,
                 odds_under = :odds_under,
@@ -515,6 +563,8 @@ class OddsApiService
                 updated_at = NOW()
                 WHERE prop_id = :prop_id");
             $update->execute([
+                ':bookmaker_id'    => $bookmakerId,
+                ':game_id'         => $gameId,
                 ':line_over'       => $lineOver,
                 ':odds_over'       => $oddsOver,
                 ':odds_under'      => $oddsUnder,

@@ -178,7 +178,7 @@ class EspnApiService
             'team_abbr' => 'DET',
             'stat_type' => 'rushing_yards',
             'espn_stat' => 'rushingYards',
-            'line'      => 68.5
+            'line'      => 98.5
         ],
         [
             'espn_id'   => 3929630,
