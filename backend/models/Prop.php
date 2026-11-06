@@ -50,6 +50,14 @@ class Prop
                         WHEN g.home_team_id = t.team_id THEN away_t.name
                         ELSE home_t.name
                     END AS opponent_name,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.defensive_rank
+                        ELSE home_t.defensive_rank
+                    END AS opponent_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.abbreviation
+                        ELSE home_t.abbreviation
+                    END AS opponent_abbreviation,
                     b.bookmaker_id,
                     b.name AS bookmaker_name,
                     g.game_id,
@@ -112,6 +120,14 @@ class Prop
                         WHEN g.home_team_id = t.team_id THEN away_t.name
                         ELSE home_t.name
                     END AS opponent_name,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.defensive_rank
+                        ELSE home_t.defensive_rank
+                    END AS opponent_rank,
+                    CASE 
+                        WHEN g.home_team_id = t.team_id THEN away_t.abbreviation
+                        ELSE home_t.abbreviation
+                    END AS opponent_abbreviation,
                     b.bookmaker_id,
                     b.name AS bookmaker_name,
                     g.game_id,

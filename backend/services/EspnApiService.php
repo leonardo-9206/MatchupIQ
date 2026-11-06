@@ -100,7 +100,7 @@ class EspnApiService
             'line'      => 255.5
         ],
         [
-            'espn_id'   => 4362628,
+            'espn_id'   => 4379399,
             'name'      => 'James Cook',
             'position'  => 'RB',
             'team_abbr' => 'BUF',

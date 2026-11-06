@@ -186,7 +186,7 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
                 <span>Contexto Defensivo del Rival</span>
               </div>
               <p className="text-slate-300 leading-relaxed text-[11px]">
-                {prop.opponent_abbreviation} se ubica como la defensa <strong className="text-white">#{prop.opponent_rank}</strong> de la liga permitiendo yardas en esta categoría. Este enfrentamiento otorga una ventaja estadística favorable para el pick sugerido.
+                {(prop.opponent_abbreviation || prop.opponent_name || 'El rival')} se ubica como la defensa <strong className="text-white">#{(prop.opponent_rank || prop.opposing_defensive_rank || 16)}</strong> de la liga permitiendo yardas en esta categoría. Este enfrentamiento otorga una ventaja estadística favorable para el pick sugerido.
               </p>
             </div>
 
@@ -213,3 +213,5 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
     </div>
   );
 }
+
+
