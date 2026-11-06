@@ -152,8 +152,10 @@ class EdgeCalculatorService
             return 50.0;
         }
 
+        // Dampen volatility on very small lines (< 25 yards) to avoid exaggerated edges
+        $effectiveSensitivity = ($line < 25.0) ? self::SENSITIVITY_FACTOR * max(0.25, ($line / 25.0)) : self::SENSITIVITY_FACTOR;
         $percentageDiff = ($projectedAverage - $line) / $line;
-        $projected = self::BASE_PROBABILITY + ($percentageDiff * self::SENSITIVITY_FACTOR);
+        $projected = self::BASE_PROBABILITY + ($percentageDiff * $effectiveSensitivity);
 
         // Clamp between realistic bounds (5% to 95%)
         return max(5.0, min(95.0, $projected));

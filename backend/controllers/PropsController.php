@@ -101,6 +101,16 @@ class PropsController
     private function enrichProp(array $prop, int $index = 0): array
     {
         $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
+        // Prefer dynamic average from ESPN game logs if present
+        $playerId = (int) ($prop["player_id"] ?? 0);
+        $betType = $prop["bet_type"] ?? "";
+        if ($playerId > 0 && !empty($betType)) {
+            $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+            if (!empty($dbLogs)) {
+                $vals = array_map(fn($log) => (float) $log["stat_value"], $dbLogs);
+                $playerAvg = round(array_sum($vals) / count($vals), 2);
+            }
+        }
         $line = (float) ($prop['line_over'] ?? 0.0);
         $odds = (float) ($prop['odds_over'] ?? 1.90);
         $opposingRank = (int) ($prop['opposing_defensive_rank'] ?? 16);
