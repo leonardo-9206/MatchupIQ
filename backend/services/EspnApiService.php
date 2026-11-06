@@ -40,7 +40,7 @@ class EspnApiService
             'espn_id'   => 4361529,
             'name'      => 'Isiah Pacheco',
             'position'  => 'RB',
-            'team_abbr' => 'KC',
+            'team_abbr' => 'DET',
             'stat_type' => 'rushing_yards',
             'espn_stat' => 'rushingYards',
             'line'      => 65.5
@@ -172,7 +172,7 @@ class EspnApiService
             'line'      => 79.5
         ],
         [
-            'espn_id'   => 4430755,
+            'espn_id'   => 4429795,
             'name'      => 'Jahmyr Gibbs',
             'position'  => 'RB',
             'team_abbr' => 'DET',
