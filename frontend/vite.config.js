@@ -3,7 +3,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173 },
+  resolve: {
+    preserveSymlinks: true,
+  },
+  server: {
+    host: true,
+    port: 5173,
+    fs: {
+      strict: false,
+    },
+  },
   // Vitest: runs the component tests in a simulated browser (jsdom)
   test: {
     environment: 'jsdom',
