@@ -2,7 +2,7 @@
 /**
  * EdgeCalculatorService
  * Statistical engine responsible for computing the expected positive value (+EV / Value Edge)
- * for betting player props.
+ * for betting player props and tactical coverage scheme modifiers.
  *
  * Mathematical Foundation:
  * 1. Implied Probability:
@@ -20,8 +20,8 @@
  *    - Projects performance comparing adjusted player baseline vs the line.
  *    - P_projected = 50% + [(adjusted_average - line) / line] * sensitivity
  *
- * 4. Value Edge (+EV):
- *    - Edge = P_projected - P_implied
+ * 4. Value Edge (+EV) & Tactical Coverage Modifier (HU-11):
+ *    - Edge = (P_projected - P_implied) + Tactical_Edge_Boost
  *    - A positive Edge indicates betting value where market misprices true likelihood.
  */
 
@@ -30,6 +30,7 @@ class EdgeCalculatorService
     private const BASE_PROBABILITY = 50.0;
     private const SENSITIVITY_FACTOR = 45.0; // Scaling factor for projection deltas
     private const MAX_DEFENSIVE_ADJUSTMENT = 0.12; // +/- 12% maximum modifier based on defense
+    private const MAX_TACTICAL_BOOST = 6.0; // +/- 6.0 percentage points max tactical scheme modifier
 
     /**
      * Calculates the statistical Edge (+EV) for a given prop line and market odds.
@@ -38,13 +39,15 @@ class EdgeCalculatorService
      * @param float $line Over/Under line threshold offered by the bookmaker
      * @param float $odds Market odds in decimal format (e.g. 1.90) or American format (e.g. -110, +130)
      * @param int $opposingDefensiveRank Defensive ranking of the opponent (1 to 32)
+     * @param float $tacticalEdgeBoost Optional tactical coverage scheme modifier (in percentage points)
      * @return array Detailed analytical breakdown
      */
     public function calculateEdge(
         float $playerAverage,
         float $line,
         float $odds,
-        int $opposingDefensiveRank = 16
+        int $opposingDefensiveRank = 16,
+        float $tacticalEdgeBoost = 0.0
     ): array {
         // Defensive rank clamped between 1 (best) and 32 (worst)
         $rank = max(1, min(32, $opposingDefensiveRank));
@@ -64,24 +67,56 @@ class EdgeCalculatorService
         // Projected probability of exceeding the line (Over)
         $projectedProbability = $this->estimateProjectedProbability($adjustedStatAverage, $line);
 
-        // Expected Value Edge (+EV)
-        $calculatedEdge = round($projectedProbability - $impliedProbability, 2);
+        // Expected Value Edge (+EV) including tactical scheme boost when applicable
+        $calculatedEdge = round(($projectedProbability - $impliedProbability) + $tacticalEdgeBoost, 2);
 
         // Grade recommendation
         $recommendation = $this->determineRecommendation($calculatedEdge);
 
         return [
-            'player_average'       => round($playerAverage, 2),
-            'line'                 => round($line, 2),
-            'odds'                 => round($odds, 2),
-            'defensive_rank'       => $rank,
-            'matchup_multiplier'   => round($matchupMultiplier, 4),
-            'adjusted_projection'  => round($adjustedStatAverage, 2),
-            'implied_probability'  => round($impliedProbability, 2),
-            'projected_probability'=> round($projectedProbability, 2),
-            'calculated_edge'      => $calculatedEdge,
-            'recommendation'       => $recommendation
+            'player_average'        => round($playerAverage, 2),
+            'line'                  => round($line, 2),
+            'odds'                  => round($odds, 2),
+            'defensive_rank'        => $rank,
+            'matchup_multiplier'    => round($matchupMultiplier, 4),
+            'adjusted_projection'   => round($adjustedStatAverage, 2),
+            'implied_probability'   => round($impliedProbability, 2),
+            'projected_probability' => round($projectedProbability, 2),
+            'tactical_edge_boost'   => round($tacticalEdgeBoost, 2),
+            'calculated_edge'       => $calculatedEdge,
+            'recommendation'        => $recommendation
         ];
+    }
+
+    /**
+     * Computes the tactical Edge boost (in percentage points) for a receiver based on
+     * Man vs Zone coverage alignment against the opposing defense's scheme tendencies.
+     *
+     * @param float $projectedCatchRate Weighted catch rate given opponent's Man/Zone frequency
+     * @param float $overallCatchRate Baseline overall catch rate across all targets
+     * @param float $schemeDifferential Absolute catch rate difference between preferred and secondary scheme
+     * @param string $tacticalAdvantage 'FAVORABLE', 'UNFAVORABLE', or 'NEUTRAL'
+     * @return float Tactical edge modifier in percentage points
+     */
+    public function calculateTacticalEdgeBoost(
+        float $projectedCatchRate,
+        float $overallCatchRate,
+        float $schemeDifferential,
+        string $tacticalAdvantage
+    ): float {
+        $catchRateDelta = ($projectedCatchRate - $overallCatchRate) * 1.5;
+
+        $schemeBonus = 0.0;
+        if ($tacticalAdvantage === 'FAVORABLE') {
+            $schemeBonus = $schemeDifferential * 0.50;
+        } elseif ($tacticalAdvantage === 'UNFAVORABLE') {
+            $schemeBonus = -($schemeDifferential * 0.50);
+        }
+
+        $rawBoost = $catchRateDelta + $schemeBonus;
+        $clampedBoost = max(-self::MAX_TACTICAL_BOOST, min(self::MAX_TACTICAL_BOOST, $rawBoost));
+
+        return round($clampedBoost, 2);
     }
 
     /**

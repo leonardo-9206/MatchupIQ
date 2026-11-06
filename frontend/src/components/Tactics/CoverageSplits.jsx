@@ -6,6 +6,12 @@ const SCHEMES = {
   zone: { label: 'Zone Coverage', short: 'Zone', color: '#00D2FF' },
 };
 
+const ADVANTAGE_STYLES = {
+  FAVORABLE: 'border-[#00E676]/40 bg-emerald-500/10 text-[#00E676]',
+  NEUTRAL: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+  UNFAVORABLE: 'border-[#FF3B30]/40 bg-rose-500/10 text-[#FF3B30]',
+};
+
 /**
  * Man vs Zone breakdown for a receiver (data from GET /api/tactics/coverage.php).
  *   <CoverageSplits playerId={prop.player_id} />
@@ -22,9 +28,72 @@ export default function CoverageSplits({ playerId }) {
   const preferred =
     summary?.preferred_scheme ?? splits.reduce((best, s) => (s.catch_rate > best.catch_rate ? s : best)).coverage_type;
 
+  const hasProjectionMetrics =
+    summary?.projected_catch_rate != null ||
+    summary?.tactical_advantage != null ||
+    summary?.tactical_edge_boost != null;
+
+  const advantageKey = summary?.tactical_advantage ?? 'NEUTRAL';
+  const advantageBadgeClass = ADVANTAGE_STYLES[advantageKey] ?? ADVANTAGE_STYLES.NEUTRAL;
+  const edgeBoostValue = Number(summary?.tactical_edge_boost ?? 0);
+
   return (
     <div className={`space-y-5 ${loading ? 'opacity-60' : ''}`}>
       <SourceBadge source={source} />
+
+      {/* HU-11: Tactical Matchup Projection & Edge Boost Summary */}
+      {hasProjectionMetrics && (
+        <div
+          data-testid="coverage-projection-summary"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-[#0D1527] p-3.5"
+        >
+          {summary?.tactical_advantage && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
+                Matchup Advantage:
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold ${advantageBadgeClass}`}
+              >
+                {summary.tactical_advantage}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+            {summary?.projected_catch_rate != null && (
+              <div>
+                <span className="text-slate-400">Projected Catch: </span>
+                <span className="font-bold text-white">
+                  {Number(summary.projected_catch_rate).toFixed(1)}%
+                </span>
+                {summary?.opponent_zone_rate != null && (
+                  <span className="ml-1 text-[11px] text-slate-400">
+                    (vs {Number(summary.opponent_zone_rate).toFixed(0)}% Zone)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {summary?.tactical_edge_boost != null && (
+              <div>
+                <span className="text-slate-400">Tactical Edge Boost: </span>
+                <span
+                  className={`font-bold ${
+                    edgeBoostValue > 0
+                      ? 'text-[#00E676]'
+                      : edgeBoostValue < 0
+                        ? 'text-[#FF3B30]'
+                        : 'text-slate-200'
+                  }`}
+                >
+                  {edgeBoostValue >= 0 ? `+${edgeBoostValue.toFixed(2)}%` : `${edgeBoostValue.toFixed(2)}%`}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Target share: how often the defense played each scheme when this player was targeted */}
       <div>

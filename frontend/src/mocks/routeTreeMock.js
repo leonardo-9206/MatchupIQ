@@ -26,6 +26,14 @@ export const mockRouteTrees = {
     { route_id: 8, player_id: 2, route_type: 'post', targets: 8, receptions: 5, yards_gained: 109, catch_rate: 62.5 },
     { route_id: 9, player_id: 2, route_type: 'go', targets: 5, receptions: 2, yards_gained: 58, catch_rate: 40.0 },
   ],
+  // Isiah Pacheco (RB - Kansas City Chiefs)
+  3: [
+    { route_id: 16, player_id: 3, route_type: 'flat', targets: 16, receptions: 14, yards_gained: 104, catch_rate: 87.5 },
+    { route_id: 17, player_id: 3, route_type: 'slant', targets: 6, receptions: 5, yards_gained: 39, catch_rate: 83.33 },
+    { route_id: 18, player_id: 3, route_type: 'curl', targets: 5, receptions: 4, yards_gained: 28, catch_rate: 80.0 },
+    { route_id: 19, player_id: 3, route_type: 'out', targets: 6, receptions: 4, yards_gained: 31, catch_rate: 66.67 },
+    { route_id: 20, player_id: 3, route_type: 'dig', targets: 3, receptions: 2, yards_gained: 23, catch_rate: 66.67 },
+  ],
   // Christian McCaffrey (RB, so mostly short routes)
   4: [
     { route_id: 10, player_id: 4, route_type: 'flat', targets: 22, receptions: 19, yards_gained: 148, catch_rate: 86.36 },

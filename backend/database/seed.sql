@@ -96,7 +96,11 @@ INSERT INTO `player_heatmaps` (`heatmap_id`, `player_id`, `field_zone`, `attempt
 (9, 4, 'right_tackle', 47, 266, 63.83),
 (10, 4, 'right_end', 40, 281, 67.50);
 
--- Coverage performance for Travis Kelce (player_id = 2)
+-- Coverage performance for Travis Kelce (player_id = 2), Isiah Pacheco (player_id = 3) and Christian McCaffrey (player_id = 4)
 INSERT INTO `coverage_splits` (`split_id`, `player_id`, `coverage_type`, `targets`, `receptions`, `catch_rate`) VALUES
 (1, 2, 'man', 35, 26, 74.29),
-(2, 2, 'zone', 58, 46, 79.31);
+(2, 2, 'zone', 58, 46, 79.31),
+(3, 3, 'man', 14, 11, 78.57),
+(4, 3, 'zone', 22, 18, 81.82),
+(5, 4, 'man', 29, 24, 82.76),
+(6, 4, 'zone', 41, 30, 73.17);
