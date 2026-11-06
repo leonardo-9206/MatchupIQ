@@ -257,7 +257,7 @@ export async function getProps(sport = null) {
 
     if (res.ok) {
       const data = await res.json();
-      if (data && data.success && Array.isArray(data.data?.props) && data.data.props.length > 0) {
+      if (data && ((data.success || data.status === 'success') && Array.isArray(data.data?.props)) && data.data.props.length > 0) {
         return {
           source: 'backend',
           props: data.data.props,
@@ -278,3 +278,4 @@ export async function getProps(sport = null) {
     props: filtered,
   };
 }
+
