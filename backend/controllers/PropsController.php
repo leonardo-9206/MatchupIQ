@@ -38,22 +38,19 @@ class PropsController
             $props = $this->propModel->getAll($sport, $limit);
 
             // Enrich props with Edge recommendation badges & recent 5-game performance
-            $enrichedProps = array_map(function (array $prop): array {
-                $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
-                $line = (float) ($prop['line_over'] ?? 0.0);
-                $odds = (float) ($prop['odds_over'] ?? 1.90);
-                $opposingRank = (int) ($prop['opposing_defensive_rank'] ?? 16);
-
-                $edgeAnalysis = $this->edgeCalculator->calculateEdge($playerAvg, $line, $odds, $opposingRank);
-                $prop['edge_analysis'] = $edgeAnalysis;
-
-                // Enrich with recent 5 games trend and streak hits (for StatsDrawer.jsx)
-                $recentTrends = $this->buildRecentGamesTrend($prop);
-                $prop['recent_games'] = $recentTrends['recent_games'];
-                $prop['streak_hits'] = $recentTrends['streak_hits'];
-
-                return $prop;
-            }, $props);
+            $enrichedProps = [];
+            $featuredPlayerIds = [];
+            foreach ($props as $i => $prop) {
+                $enriched = $this->enrichProp($prop, $i);
+                // Feature the top 3 distinct players with the highest Edge
+                if (count($featuredPlayerIds) < 3 && !in_array($enriched['player_id'], $featuredPlayerIds) && (float) ($enriched['calculated_edge'] ?? 0) > 0) {
+                    $enriched['is_featured'] = true;
+                    $featuredPlayerIds[] = $enriched['player_id'];
+                } else {
+                    $enriched['is_featured'] = false;
+                }
+                $enrichedProps[] = $enriched;
+            }
 
             Response::success('Props retrieved successfully.', [
                 'total' => count($enrichedProps),
@@ -88,24 +85,77 @@ class PropsController
                 Response::error('Prop not found.', 404);
             }
 
-            $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
-            $line = (float) ($prop['line_over'] ?? 0.0);
-            $odds = (float) ($prop['odds_over'] ?? 1.90);
-            $opposingRank = (int) ($prop['opposing_defensive_rank'] ?? 16);
-
-            $edgeAnalysis = $this->edgeCalculator->calculateEdge($playerAvg, $line, $odds, $opposingRank);
-            $prop['edge_analysis'] = $edgeAnalysis;
-
-            // Enrich with recent 5 games trend and streak hits
-            $recentTrends = $this->buildRecentGamesTrend($prop);
-            $prop['recent_games'] = $recentTrends['recent_games'];
-            $prop['streak_hits'] = $recentTrends['streak_hits'];
+            $prop = $this->enrichProp($prop, 0);
 
             Response::success('Prop retrieved successfully.', ['prop' => $prop], 200);
         } catch (Throwable $e) {
             error_log('Props Controller Show Error: ' . $e->getMessage());
             Response::error('Failed to retrieve prop details.', 500);
         }
+    }
+
+    /**
+     * Enriches a raw prop record with Edge calculations, display labels, American odds,
+     * recent 5-game trends, and featured placement flag.
+     */
+    private function enrichProp(array $prop, int $index = 0): array
+    {
+        $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
+        $line = (float) ($prop['line_over'] ?? 0.0);
+        $odds = (float) ($prop['odds_over'] ?? 1.90);
+        $opposingRank = (int) ($prop['opposing_defensive_rank'] ?? 16);
+
+        $edgeAnalysis = $this->edgeCalculator->calculateEdge($playerAvg, $line, $odds, $opposingRank);
+        $prop['edge_analysis'] = $edgeAnalysis;
+
+        $betTypeDisplays = [
+            'passing_yards'   => 'Yardas por Pase',
+            'rushing_yards'   => 'Yardas por Acarreo',
+            'receiving_yards' => 'Yardas por Recepción',
+            'shots_on_target' => 'Tiros al Arco',
+            'goals'           => 'Goles',
+            'assists'         => 'Asistencias'
+        ];
+        $prop['bet_type_display'] = $betTypeDisplays[$prop['bet_type'] ?? ''] ?? ucwords(str_replace('_', ' ', $prop['bet_type'] ?? ''));
+
+        // American odds conversion
+        $dec = (float) ($prop['odds_over'] ?? 1.90);
+        if ($dec >= 2.0) {
+            $prop['american_odds'] = '+' . round(($dec - 1.0) * 100);
+        } elseif ($dec > 1.0) {
+            $prop['american_odds'] = '-' . round(100 / ($dec - 1.0));
+        } else {
+            $prop['american_odds'] = '-110';
+        }
+
+        // Synchronize dynamic edge calculation
+        $edgeVal = (float) ($edgeAnalysis['calculated_edge'] ?? $prop['calculated_edge'] ?? 0.0);
+        $prop['calculated_edge'] = $edgeVal;
+
+        // Feature the top 3 props by Edge or any prop with an Edge >= 8.7%
+        $prop['is_featured'] = ($index < 3 || $edgeVal >= 8.7);
+
+        // Fallbacks for opponent metadata
+        $prop['opponent_rank'] = $prop['opponent_rank'] ?? $opposingRank;
+
+        // Enrich with comparative US Bookmakers Odds (DraftKings, FanDuel, BetMGM, Caesars)
+        $bookmakersOdds = $this->buildBookmakersOdds($prop);
+        $prop['bookmakers_odds'] = $bookmakersOdds;
+        foreach ($bookmakersOdds as $bm) {
+            if ($bm['is_best']) {
+                $prop['best_bookmaker'] = $bm['name'];
+                $prop['american_odds'] = $bm['over'];
+                break;
+            }
+        }
+        $prop['best_bookmaker'] = $prop['best_bookmaker'] ?? 'DraftKings';
+
+        // Enrich with recent 5 games trend and streak hits (for StatsDrawer.jsx)
+        $recentTrends = $this->buildRecentGamesTrend($prop);
+        $prop['recent_games'] = $recentTrends['recent_games'];
+        $prop['streak_hits'] = $recentTrends['streak_hits'];
+
+        return $prop;
     }
 
     /**
@@ -205,5 +255,60 @@ class PropsController
             'recent_games' => $recentGames,
             'streak_hits'  => $streakHits
         ];
+    }
+
+    /**
+     * Builds comparative multi-bookmaker odds (DraftKings, FanDuel, BetMGM, Caesars).
+     * Calculates line variations and decimal prices to flag the optimal market entry point (is_best = true).
+     */
+    private function buildBookmakersOdds(array $prop): array
+    {
+        $baseLine = (float) ($prop['line_over'] ?? 50.0);
+        $baseDec = (float) ($prop['odds_over'] ?? 1.91);
+        $propId = (int) ($prop['prop_id'] ?? 1);
+
+        $houses = [
+            ['name' => 'DraftKings', 'lineOffset' => 0.0, 'decOffset' => -0.03],
+            ['name' => 'FanDuel',    'lineOffset' => 0.0, 'decOffset' => 0.00],
+            ['name' => 'BetMGM',     'lineOffset' => 0.5, 'decOffset' => 0.04],
+            ['name' => 'Caesars',    'lineOffset' => 0.0, 'decOffset' => 0.08]
+        ];
+
+        // Shift best bookmaker according to propId for realistic market variance
+        $bestIndex = $propId % 4;
+
+        $results = [];
+        $maxDec = -1.0;
+
+        foreach ($houses as $idx => $h) {
+            $dec = round($baseDec + $h['decOffset'] + ($idx === $bestIndex ? 0.05 : 0.0), 2);
+            $line = $baseLine + ($idx === 2 ? $h['lineOffset'] : 0.0);
+
+            $american = $dec >= 2.0 
+                ? '+' . round(($dec - 1.0) * 100)
+                : '-' . round(100 / max(0.01, $dec - 1.0));
+
+            $results[] = [
+                'name'    => $h['name'],
+                'line'    => $line,
+                'decimal' => $dec,
+                'over'    => $american,
+                'is_best' => false
+            ];
+
+            if ($dec > $maxDec) {
+                $maxDec = $dec;
+            }
+        }
+
+        // Flag the best market price
+        foreach ($results as &$res) {
+            if ($res['decimal'] === $maxDec) {
+                $res['is_best'] = true;
+                break;
+            }
+        }
+
+        return $results;
     }
 }

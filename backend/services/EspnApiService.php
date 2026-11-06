@@ -355,9 +355,12 @@ class EspnApiService
             return 0;
         }
 
-        // Clean stale logs for this athlete to prevent duplicates with previous seeds/syncs
-        $delStmt = $this->db->prepare("DELETE FROM player_game_logs WHERE player_id = :player_id");
-        $delStmt->execute([':player_id' => $playerId]);
+        // Clean out legacy/stale records for this player and stat to prevent ghost duplicates
+        $purge = $this->db->prepare("DELETE FROM player_game_logs WHERE player_id = :player_id AND stat_type = :stat_type");
+        $purge->execute([
+            ':player_id' => $playerId,
+            ':stat_type' => $logs[0]['stat_type']
+        ]);
 
         $stored = 0;
         $totalStat = 0.0;

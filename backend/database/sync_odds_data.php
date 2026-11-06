@@ -34,7 +34,7 @@ try {
         $events = json_decode($cachedRow['response_data'], true);
         echo "    [+] Retrieved " . count($events) . " events from existing `odds_cache`.\n";
     } else {
-        // Try fetching via OddsApiService if API key is present or forced
+        // Fetch via OddsApiService if API key is present or forced
         $sport = 'americanfootball_nfl';
         $markets = ['h2h', 'player_pass_yds', 'player_rush_yds', 'player_reception_yds'];
 
@@ -44,139 +44,11 @@ try {
             $source = $apiResult['source'];
             echo "    [+] Fetched " . count($events) . " events via {$source}.\n";
         } else {
-            // Dev Fallback: If cache is empty and API call cannot proceed (e.g. no key),
-            // seed realistic upcoming matchups into odds_cache to unblock calendar development
-            echo "    [*] Initializing default real NFL matchups into `odds_cache`...\n";
-            $events = [
-                [
-                    'id'            => 'odds_nfl_sf_lv_' . date('Ymd'),
-                    'sport_key'     => 'americanfootball_nfl',
-                    'home_team'     => 'Las Vegas Raiders',
-                    'away_team'     => 'San Francisco 49ers',
-                    'commence_time' => date('Y-m-d\T19:15:00\Z', time() + (2 * 86400)),
-                    'bookmakers'    => [
-                        [
-                            'key'     => 'bet365',
-                            'title'   => 'Bet365',
-                            'markets' => [
-                                [
-                                    'key'      => 'player_pass_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Brock Purdy', 'price' => 1.90, 'point' => 248.5],
-                                        ['name' => 'Under', 'description' => 'Brock Purdy', 'price' => 1.90, 'point' => 248.5]
-                                    ]
-                                ],
-                                [
-                                    'key'      => 'player_rush_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Christian McCaffrey', 'price' => 1.95, 'point' => 84.5],
-                                        ['name' => 'Under', 'description' => 'Christian McCaffrey', 'price' => 1.85, 'point' => 84.5]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'id'            => 'odds_nfl_kc_nyj_' . date('Ymd'),
-                    'sport_key'     => 'americanfootball_nfl',
-                    'home_team'     => 'New York Jets',
-                    'away_team'     => 'Kansas City Chiefs',
-                    'commence_time' => date('Y-m-d\T20:20:00\Z', time() + (3 * 86400)),
-                    'bookmakers'    => [
-                        [
-                            'key'     => 'bet365',
-                            'title'   => 'Bet365',
-                            'markets' => [
-                                [
-                                    'key'      => 'player_pass_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Patrick Mahomes', 'price' => 1.92, 'point' => 272.5],
-                                        ['name' => 'Under', 'description' => 'Patrick Mahomes', 'price' => 1.88, 'point' => 272.5]
-                                    ]
-                                ],
-                                [
-                                    'key'      => 'player_rush_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Breece Hall', 'price' => 1.91, 'point' => 68.5],
-                                        ['name' => 'Under', 'description' => 'Breece Hall', 'price' => 1.91, 'point' => 68.5]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'id'            => 'odds_nfl_buf_mia_' . date('Ymd'),
-                    'sport_key'     => 'americanfootball_nfl',
-                    'home_team'     => 'Miami Dolphins',
-                    'away_team'     => 'Buffalo Bills',
-                    'commence_time' => date('Y-m-d\T15:00:00\Z', time() + (4 * 86400)),
-                    'bookmakers'    => [
-                        [
-                            'key'     => 'caliente',
-                            'title'   => 'Caliente',
-                            'markets' => [
-                                [
-                                    'key'      => 'player_pass_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Josh Allen', 'price' => 1.90, 'point' => 258.5],
-                                        ['name' => 'Under', 'description' => 'Josh Allen', 'price' => 1.90, 'point' => 258.5]
-                                    ]
-                                ],
-                                [
-                                    'key'      => 'player_rush_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'De\'Von Achane', 'price' => 1.89, 'point' => 64.5],
-                                        ['name' => 'Under', 'description' => 'De\'Von Achane', 'price' => 1.91, 'point' => 64.5]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'id'            => 'odds_nfl_bal_pit_' . date('Ymd'),
-                    'sport_key'     => 'americanfootball_nfl',
-                    'home_team'     => 'Pittsburgh Steelers',
-                    'away_team'     => 'Baltimore Ravens',
-                    'commence_time' => date('Y-m-d\T18:00:00\Z', time() + (4 * 86400)),
-                    'bookmakers'    => [
-                        [
-                            'key'     => 'bet365',
-                            'title'   => 'Bet365',
-                            'markets' => [
-                                [
-                                    'key'      => 'player_pass_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Lamar Jackson', 'price' => 1.94, 'point' => 228.5],
-                                        ['name' => 'Under', 'description' => 'Lamar Jackson', 'price' => 1.86, 'point' => 228.5]
-                                    ]
-                                ],
-                                [
-                                    'key'      => 'player_rush_yds',
-                                    'outcomes' => [
-                                        ['name' => 'Over', 'description' => 'Derrick Henry', 'price' => 1.91, 'point' => 86.5],
-                                        ['name' => 'Under', 'description' => 'Derrick Henry', 'price' => 1.91, 'point' => 86.5]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ];
-
-            // Persist to odds_cache with 24h validity
-            $saveCache = $db->prepare("INSERT INTO `odds_cache` (`cache_key`, `sport_key`, `response_data`, `expires_at`)
-                                       VALUES (:ckey, :skey, :data, DATE_ADD(NOW(), INTERVAL 24 HOUR))
-                                       ON DUPLICATE KEY UPDATE `response_data` = VALUES(`response_data`), `expires_at` = VALUES(`expires_at`)");
-            $saveCache->execute([
-                ':ckey' => 'odds_americanfootball_nfl_h2h_player_props',
-                ':skey' => 'americanfootball_nfl',
-                ':data' => json_encode($events)
-            ]);
-            $source = 'dev_cache_seeder';
-            echo "    [+] Initialized " . count($events) . " dynamic NFL matchups in `odds_cache`.\n";
+            echo "    [!] Warning: External odds API fetch was unsuccessful: " . ($apiResult['error'] ?? 'Unknown error') . "\n";
+            if ($cachedRow && !empty($cachedRow['response_data'])) {
+                $events = json_decode($cachedRow['response_data'], true);
+                echo "    [*] Falling back to cached events (" . count($events) . " events).\n";
+            }
         }
     }
 
@@ -231,9 +103,9 @@ try {
     echo "\n[*] Step 3: Recalculating props and Value Edge against real weekly opponents...\n";
     $syncStats = $oddsService->syncOddsToProps($events);
 
-    echo "    [+] Events Processed: " . $syncStats['events_processed'] . "\n";
-    echo "    [+] Props Updated:    " . $syncStats['updated'] . "\n";
-    echo "    [+] Props Inserted:   " . $syncStats['inserted'] . "\n";
+    echo "    [+] Events Processed: " . ($syncStats['events_processed'] ?? 0) . "\n";
+    echo "    [+] Props Updated:    " . ($syncStats['updated'] ?? 0) . "\n";
+    echo "    [+] Props Inserted:   " . ($syncStats['inserted'] ?? 0) . "\n";
 
     // Step 4: Display current calendar overview
     echo "\n--- Current Active Calendar Games in MatchupIQ ---\n";

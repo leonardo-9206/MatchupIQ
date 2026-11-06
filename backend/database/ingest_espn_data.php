@@ -75,7 +75,6 @@ try {
 
     // 3. Sync recent game logs (Cleaning stale seed history before ingestion)
     echo "[*] Step 3: Fetching empirical 5-game performance logs from ESPN...\n";
-    echo "    [*] Wiping obsolete seed history (DELETE FROM player_game_logs WHERE player_id = :id) to prevent duplicate records...\n";
     $result = $espnService->syncAllPresetAthletes(5);
 
     echo "\n[+] Game Logs Ingestion Finished Successfully!\n";
@@ -83,7 +82,7 @@ try {
     echo "  - Athletes Synced:      " . $result['athletes_synced'] . "\n";
     echo "  - Total Logs Ingested:  " . $result['total_logs_ingested'] . "\n\n";
 
-    echo "--- Recent Ingestions ---\n";
+    echo "--- Ingestion Details ---\n";
     foreach ($result['details'] as $detail) {
         echo sprintf(
             "  [%s] %-22s (%s - %s) -> %d games ingested\n",
