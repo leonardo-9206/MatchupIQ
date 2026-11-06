@@ -73,8 +73,9 @@ try {
         echo "        - Updated: " . $rosterResult['updated'] . "\n\n";
     }
 
-    // 3. Sync recent game logs
+    // 3. Sync recent game logs (Cleaning stale seed history before ingestion)
     echo "[*] Step 3: Fetching empirical 5-game performance logs from ESPN...\n";
+    echo "    [*] Wiping obsolete seed history (DELETE FROM player_game_logs WHERE player_id = :id) to prevent duplicate records...\n";
     $result = $espnService->syncAllPresetAthletes(5);
 
     echo "\n[+] Game Logs Ingestion Finished Successfully!\n";

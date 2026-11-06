@@ -100,13 +100,148 @@ class EspnApiService
             'line'      => 255.5
         ],
         [
-            'espn_id'   => 4362628,
+            'espn_id'   => 4379399,
             'name'      => 'James Cook',
             'position'  => 'RB',
             'team_abbr' => 'BUF',
             'stat_type' => 'rushing_yards',
             'espn_stat' => 'rushingYards',
             'line'      => 62.5
+        ],
+        [
+            'espn_id'   => 3915511,
+            'name'      => 'Joe Burrow',
+            'position'  => 'QB',
+            'team_abbr' => 'CIN',
+            'stat_type' => 'passing_yards',
+            'espn_stat' => 'passingYards',
+            'line'      => 268.5
+        ],
+        [
+            'espn_id'   => 4362628,
+            'name'      => "Ja'Marr Chase",
+            'position'  => 'WR',
+            'team_abbr' => 'CIN',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 84.5
+        ],
+        [
+            'espn_id'   => 4432577,
+            'name'      => 'C.J. Stroud',
+            'position'  => 'QB',
+            'team_abbr' => 'HOU',
+            'stat_type' => 'passing_yards',
+            'espn_stat' => 'passingYards',
+            'line'      => 258.5
+        ],
+        [
+            'espn_id'   => 4258173,
+            'name'      => 'Nico Collins',
+            'position'  => 'WR',
+            'team_abbr' => 'HOU',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 78.5
+        ],
+        [
+            'espn_id'   => 4262921,
+            'name'      => 'Justin Jefferson',
+            'position'  => 'WR',
+            'team_abbr' => 'MIN',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 88.5
+        ],
+        [
+            'espn_id'   => 4241389,
+            'name'      => 'CeeDee Lamb',
+            'position'  => 'WR',
+            'team_abbr' => 'DAL',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 85.5
+        ],
+        [
+            'espn_id'   => 4374302,
+            'name'      => 'Amon-Ra St. Brown',
+            'position'  => 'WR',
+            'team_abbr' => 'DET',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 79.5
+        ],
+        [
+            'espn_id'   => 4430755,
+            'name'      => 'Jahmyr Gibbs',
+            'position'  => 'RB',
+            'team_abbr' => 'DET',
+            'stat_type' => 'rushing_yards',
+            'espn_stat' => 'rushingYards',
+            'line'      => 68.5
+        ],
+        [
+            'espn_id'   => 3929630,
+            'name'      => 'Saquon Barkley',
+            'position'  => 'RB',
+            'team_abbr' => 'PHI',
+            'stat_type' => 'rushing_yards',
+            'espn_stat' => 'rushingYards',
+            'line'      => 82.5
+        ],
+        [
+            'espn_id'   => 4040715,
+            'name'      => 'Jalen Hurts',
+            'position'  => 'QB',
+            'team_abbr' => 'PHI',
+            'stat_type' => 'passing_yards',
+            'espn_stat' => 'passingYards',
+            'line'      => 235.5
+        ],
+        [
+            'espn_id'   => 4427366,
+            'name'      => 'Breece Hall',
+            'position'  => 'RB',
+            'team_abbr' => 'NYJ',
+            'stat_type' => 'rushing_yards',
+            'espn_stat' => 'rushingYards',
+            'line'      => 66.5
+        ],
+        [
+            'espn_id'   => 4426515,
+            'name'      => 'Garrett Wilson',
+            'position'  => 'WR',
+            'team_abbr' => 'NYJ',
+            'stat_type' => 'receiving_yards',
+            'espn_stat' => 'receivingYards',
+            'line'      => 68.5
+        ],
+        [
+            'espn_id'   => 4430807,
+            'name'      => 'Bijan Robinson',
+            'position'  => 'RB',
+            'team_abbr' => 'ATL',
+            'stat_type' => 'rushing_yards',
+            'espn_stat' => 'rushingYards',
+            'line'      => 74.5
+        ],
+        [
+            'espn_id'   => 4036378,
+            'name'      => 'Jordan Love',
+            'position'  => 'QB',
+            'team_abbr' => 'GB',
+            'stat_type' => 'passing_yards',
+            'espn_stat' => 'passingYards',
+            'line'      => 252.5
+        ],
+        [
+            'espn_id'   => 4426348,
+            'name'      => 'Jayden Daniels',
+            'position'  => 'QB',
+            'team_abbr' => 'WSH',
+            'stat_type' => 'passing_yards',
+            'espn_stat' => 'passingYards',
+            'line'      => 230.5
         ]
     ];
 
@@ -219,6 +354,10 @@ class EspnApiService
         if (empty($logs)) {
             return 0;
         }
+
+        // Clean stale logs for this athlete to prevent duplicates with previous seeds/syncs
+        $delStmt = $this->db->prepare("DELETE FROM player_game_logs WHERE player_id = :player_id");
+        $delStmt->execute([':player_id' => $playerId]);
 
         $stored = 0;
         $totalStat = 0.0;
