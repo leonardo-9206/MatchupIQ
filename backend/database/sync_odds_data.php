@@ -15,6 +15,9 @@ echo "====================================================\n";
 echo "Timestamp: " . date('Y-m-d H:i:s') . "\n\n";
 
 try {
+    // Initialize Database to trigger environment loading from .env
+    Database::getInstance();
+
     $apiKey = getenv('ODDS_API_KEY');
     if (empty($apiKey) || $apiKey === 'your_the_odds_api_key_here') {
         echo "[!] ERROR: ODDS_API_KEY is not configured in backend/.env\n";

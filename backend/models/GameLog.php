@@ -60,7 +60,7 @@ class GameLog
     private function tableExists(string $tableName): bool
     {
         try {
-            $stmt = $this->db->prepare("SHOW TABLES LIKE :table_name");
+            $stmt = $this->db->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name LIMIT 1");
             $stmt->bindValue(':table_name', $tableName, PDO::PARAM_STR);
             $stmt->execute();
             return (bool) $stmt->fetchColumn();
