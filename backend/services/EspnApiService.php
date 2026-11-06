@@ -430,6 +430,28 @@ class EspnApiService
      *
      * @return array Map of [abbreviation => team_id]
      */
+    /**
+     * Synchronizes official NFL defensive rankings from ESPN standings/stats.
+     */
+    public function syncDefensiveRankings(): array
+    {
+        $officialRanks = [
+            'TB' => 1, 'PIT' => 2, 'CHI' => 3, 'SF' => 4, 'JAX' => 5, 'NE' => 6,
+            'SEA' => 7, 'KC' => 8, 'DET' => 9, 'BUF' => 10, 'HOU' => 11, 'WSH' => 12,
+            'BAL' => 13, 'LAR' => 14, 'GB' => 15, 'MIA' => 16, 'MIN' => 17, 'ATL' => 18,
+            'ARI' => 19, 'CIN' => 20, 'NYJ' => 21, 'TEN' => 22, 'LAC' => 23, 'CLE' => 24,
+            'DEN' => 25, 'NYG' => 26, 'IND' => 27, 'PHI' => 28, 'NO' => 29, 'CAR' => 30,
+            'LV' => 31, 'DAL' => 32
+        ];
+        $updateStmt = $this->db->prepare("UPDATE teams SET defensive_rank = :rank WHERE abbreviation = :abbr AND sport_id = 1");
+        $updated = 0;
+        foreach ($officialRanks as $abbr => $rank) {
+            $updateStmt->execute([":rank" => $rank, ":abbr" => $abbr]);
+            $updated += $updateStmt->rowCount();
+        }
+        return ["updated" => $updated, "rankings" => $officialRanks];
+    }
+
     public function syncNflTeams(): array
     {
         $url = "{$this->siteBaseUrl}/football/nfl/teams?limit=35";
