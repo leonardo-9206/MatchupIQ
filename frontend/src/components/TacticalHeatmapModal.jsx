@@ -15,8 +15,8 @@ const TACTICAL_VIEWS = {
 // RBs run and catch, WRs/TEs only catch, QBs only have designed runs/scrambles.
 export const POSITION_VIEWS = {
   RB: ['heatmap', 'routes', 'coverage'],
-  WR: ['routes', 'coverage'],
-  TE: ['routes', 'coverage'],
+  WR: ['routes', 'heatmap', 'coverage'],
+  TE: ['routes', 'heatmap', 'coverage'],
   QB: ['heatmap'],
 };
 
@@ -26,11 +26,11 @@ const POSITION_COPY = {
     description: 'Desglose integral de acarreos por carril, árbol de rutas y coberturas defensivas',
   },
   WR: {
-    badge: 'WR: Passing & Coverage Maps',
+    badge: 'WR: Route Tree & Receiving Zones',
     description: 'Análisis aéreo de árbol de rutas (Route Tree) y rendimiento contra coberturas Man vs Zone',
   },
   TE: {
-    badge: 'TE: Passing & Coverage Maps',
+    badge: 'TE: Route Tree & Receiving Zones',
     description: 'Análisis aéreo de árbol de rutas (Route Tree) y rendimiento contra coberturas Man vs Zone',
   },
   QB: {
@@ -160,7 +160,8 @@ export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId
                   </span>
                   <div className="flex rounded-xl border border-slate-700 bg-[#0D1527] p-1" role="tablist">
                     {availableViews.map((key) => {
-                      const { label, icon: Icon } = TACTICAL_VIEWS[key];
+                      const { label: defaultLabel, icon: Icon } = TACTICAL_VIEWS[key];
+                      const label = key === 'heatmap' && (position === 'WR' || position === 'TE') ? 'Receiving Zones' : defaultLabel;
                       return (
                         <button
                           key={key}
