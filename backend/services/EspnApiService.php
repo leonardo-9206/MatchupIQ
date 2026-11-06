@@ -283,6 +283,250 @@ class EspnApiService
     }
 
     /**
+     * Synchronizes all 32 NFL franchises from ESPN API into MySQL `teams` table.
+     * Ensures each team exists with sport_id = 1 and a valid defensive_rank (1-32).
+     *
+     * @return array Map of [abbreviation => team_id]
+     */
+    public function syncNflTeams(): array
+    {
+        $url = "{$this->siteBaseUrl}/football/nfl/teams?limit=35";
+        $response = $this->executeCurl($url);
+
+        if (!$response['success'] || !isset($response['data']['sports'][0]['leagues'][0]['teams'])) {
+            return [];
+        }
+
+        $espnTeams = $response['data']['sports'][0]['leagues'][0]['teams'];
+        $abbrMap = [];
+
+        $stmt = $this->db->query("SELECT team_id, abbreviation FROM teams WHERE sport_id = 1");
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $abbrMap[strtoupper($row['abbreviation'])] = (int) $row['team_id'];
+        }
+
+        $insertStmt = $this->db->prepare("INSERT INTO teams (sport_id, name, abbreviation, defensive_rank) VALUES (1, :name, :abbr, :rank)");
+
+        foreach ($espnTeams as $idx => $t) {
+            $tm = $t['team'];
+            $abbr = strtoupper(trim($tm['abbreviation']));
+            $name = trim($tm['displayName']);
+
+            if (!isset($abbrMap[$abbr])) {
+                $rank = $idx + 1;
+                $insertStmt->execute([
+                    ':name' => $name,
+                    ':abbr' => $abbr,
+                    ':rank' => $rank
+                ]);
+                $abbrMap[$abbr] = (int) $this->db->lastInsertId();
+            }
+        }
+
+        return $abbrMap;
+    }
+
+    /**
+     * Builds an in-memory dictionary of all 2,500+ active NFL players across 32 teams.
+     *
+     * @return array [normalized_name => ['name' => ..., 'position' => ..., 'team_abbr' => ..., 'espn_id' => ...]]
+     */
+    public function fetchRosterMap(): array
+    {
+        $url = "{$this->siteBaseUrl}/football/nfl/teams?limit=35";
+        $response = $this->executeCurl($url);
+        if (!$response['success'] || !isset($response['data']['sports'][0]['leagues'][0]['teams'])) {
+            return [];
+        }
+
+        $espnTeams = $response['data']['sports'][0]['leagues'][0]['teams'];
+        $dict = [];
+
+        foreach ($espnTeams as $t) {
+            $tm = $t['team'];
+            $teamId = $tm['id'];
+            $teamAbbr = strtoupper(trim($tm['abbreviation']));
+            $teamName = trim($tm['displayName']);
+
+            $rosterUrl = "{$this->siteBaseUrl}/football/nfl/teams/{$teamId}/roster";
+            $rosterRes = $this->executeCurl($rosterUrl);
+            if (!$rosterRes['success'] || !isset($rosterRes['data']['athletes'])) {
+                continue;
+            }
+
+            foreach ($rosterRes['data']['athletes'] as $group) {
+                foreach ($group['items'] ?? [] as $athlete) {
+                    $fullName = trim($athlete['fullName'] ?? $athlete['displayName'] ?? '');
+                    if ($fullName === '') continue;
+
+                    $pos = strtoupper(trim($athlete['position']['abbreviation'] ?? 'ATH'));
+                    $espnId = (int) ($athlete['id'] ?? 0);
+
+                    $key = $this->normalizePlayerName($fullName);
+                    $dict[$key] = [
+                        'name'      => $fullName,
+                        'position'  => $pos,
+                        'team_abbr' => $teamAbbr,
+                        'team_name' => $teamName,
+                        'espn_id'   => $espnId
+                    ];
+                }
+            }
+        }
+
+        return $dict;
+    }
+
+    /**
+     * Searches ESPN search API for players not directly found in the 53-man active rosters
+     * (e.g. players on injured reserve, practice squad, or spelling variations).
+     */
+    public function searchAthleteFallback(string $name): ?array
+    {
+        $searchUrl = "https://site.web.api.espn.com/apis/search/v2?query=" . urlencode($name) . "&limit=5";
+        $response = $this->executeCurl($searchUrl);
+        if (!$response['success'] || !isset($response['data']['results'])) {
+            return null;
+        }
+
+        foreach ($response['data']['results'] as $res) {
+            foreach ($res['contents'] ?? [] as $c) {
+                if (($c['type'] ?? '') === 'player') {
+                    $link = $c['link']['web'] ?? '';
+                    if (preg_match('/\/id\/(\d+)/', $link, $matches)) {
+                        $espnId = (int) $matches[1];
+                        $athUrl = "{$this->commonBaseUrl}/football/nfl/athletes/{$espnId}";
+                        $athRes = $this->executeCurl($athUrl);
+                        $athlete = $athRes['data']['athlete'] ?? null;
+                        if ($athlete) {
+                            return [
+                                'name'      => trim($athlete['displayName']),
+                                'position'  => strtoupper(trim($athlete['position']['abbreviation'] ?? 'ATH')),
+                                'team_abbr' => strtoupper(trim($athlete['team']['abbreviation'] ?? 'FA')),
+                                'team_name' => trim($athlete['team']['displayName'] ?? 'Free Agent'),
+                                'espn_id'   => $espnId
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalizes a player name by stripping accents, suffixes, punctuation, and extra whitespace.
+     */
+    public function normalizePlayerName(string $name): string
+    {
+        $name = str_replace(['é', 'è', 'ê', 'ë'], 'e', $name);
+        $name = str_replace(['á', 'à', 'â', 'ä'], 'a', $name);
+        $name = str_replace(['í', 'ì', 'î', 'ï'], 'i', $name);
+        $name = str_replace(['ó', 'ò', 'ô', 'ö'], 'o', $name);
+        $name = str_replace(['ú', 'ù', 'û', 'ü'], 'u', $name);
+        $name = str_replace(['ñ'], 'n', $name);
+        $name = preg_replace('/\b(Jr|Sr|III|II|IV)\.?\b/i', '', $name);
+        $name = str_replace(['.', "'", '-', '"'], '', $name);
+        $name = preg_replace('/\s+/', ' ', $name);
+        return strtolower(trim($name));
+    }
+
+    /**
+     * Synchronizes an arbitrary list of player names by looking up their ESPN identity,
+     * associating their real NFL team and position, and persisting them in MySQL `players`.
+     *
+     * @param array $names List of player names to resolve
+     * @return array Detailed sync metrics
+     */
+    public function syncPlayerList(array $names): array
+    {
+        $abbrMap = $this->syncNflTeams();
+        $rosterDict = $this->fetchRosterMap();
+
+        $findPlayerStmt = $this->db->prepare("SELECT player_id, team_id, position, stat_average FROM players WHERE LOWER(name) = LOWER(:name) LIMIT 1");
+        $insertPlayerStmt = $this->db->prepare("INSERT INTO players (team_id, name, position, stat_average) VALUES (:team_id, :name, :pos, :avg)");
+        $updatePlayerStmt = $this->db->prepare("UPDATE players SET team_id = :team_id, position = :pos WHERE player_id = :id");
+
+        $defaultAverages = [
+            'QB'  => 248.50,
+            'RB'  => 64.20,
+            'WR'  => 58.80,
+            'TE'  => 45.30,
+            'FB'  => 12.00,
+            'ATH' => 50.00
+        ];
+
+        $resolved = 0;
+        $inserted = 0;
+        $updated = 0;
+        $fallbackUsed = 0;
+        $unresolved = [];
+
+        foreach ($names as $rawName) {
+            $rawName = trim($rawName);
+            if ($rawName === '') continue;
+
+            $key = $this->normalizePlayerName($rawName);
+            $athlete = $rosterDict[$key] ?? null;
+
+            if (!$athlete) {
+                $athlete = $this->searchAthleteFallback($rawName);
+                if ($athlete) {
+                    $fallbackUsed++;
+                }
+            }
+
+            if (!$athlete) {
+                $unresolved[] = $rawName;
+                continue;
+            }
+
+            $resolved++;
+            $officialName = $athlete['name'];
+            $pos = $athlete['position'];
+            $teamAbbr = $athlete['team_abbr'];
+            $teamId = $abbrMap[$teamAbbr] ?? 1;
+            $avg = $defaultAverages[$pos] ?? 50.00;
+
+            $findPlayerStmt->execute([':name' => $officialName]);
+            $existing = $findPlayerStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$existing) {
+                $findPlayerStmt->execute([':name' => $rawName]);
+                $existing = $findPlayerStmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if ($existing) {
+                $updatePlayerStmt->execute([
+                    ':team_id' => $teamId,
+                    ':pos'     => $pos,
+                    ':id'      => $existing['player_id']
+                ]);
+                $updated++;
+            } else {
+                $insertPlayerStmt->execute([
+                    ':team_id' => $teamId,
+                    ':name'    => $officialName,
+                    ':pos'     => $pos,
+                    ':avg'     => $avg
+                ]);
+                $inserted++;
+            }
+        }
+
+        return [
+            'success'        => true,
+            'total_names'    => count($names),
+            'resolved'       => $resolved,
+            'fallback_used'  => $fallbackUsed,
+            'inserted'       => $inserted,
+            'updated'        => $updated,
+            'unresolved'     => $unresolved
+        ];
+    }
+
+    /**
      * Executes end-to-end synchronization for all preset athletes:
      * 1. Ensures player records exist in MySQL.
      * 2. Fetches real ESPN gamelogs via cURL.
