@@ -141,4 +141,5 @@ INSERT INTO `player_game_logs` (`player_id`, `opponent_abbr`, `stat_type`, `stat
 (2, 'DEN', 'receiving_yards', 64.00, '2026-10-11', 0),
 (2, 'LV',  'receiving_yards', 89.00, '2026-10-04', 1),
 (2, 'SF',  'receiving_yards', 58.00, '2026-09-27', 0),
-(2, 'BAL', 'receiving_yards', 75.00, '2026-09-20', 1); (feat(database): add player_game_logs table and seed data for recent player trends)
+(2, 'BAL', 'receiving_yards', 75.00, '2026-09-20', 1);
+
