@@ -43,7 +43,7 @@ INSERT INTO `sports` (`sport_id`, `name`, `slug`) VALUES
 (2, 'Liga MX', 'ligamx');
 
 INSERT INTO `teams` (`team_id`, `sport_id`, `name`, `abbreviation`, `defensive_rank`) VALUES
-(1, 1, 'Kansas City Chiefs', 'KC', 4),
+(1, 1, 'Kansas City Chiefs', 'KC', 13),
 (2, 1, 'San Francisco 49ers', 'SF', 7),
 (3, 1, 'Baltimore Ravens', 'BAL', 3),
 (4, 1, 'Buffalo Bills', 'BUF', 11),
@@ -81,7 +81,7 @@ INSERT INTO `teams` (`team_id`, `sport_id`, `name`, `abbreviation`, `defensive_r
 INSERT INTO `players` (`player_id`, `team_id`, `name`, `position`, `stat_average`) VALUES
 (1, 1, 'Patrick Mahomes', 'QB', 310.00),
 (2, 1, 'Travis Kelce', 'TE', 47.60),
-(3, 1, 'Isiah Pacheco', 'RB', 26.60),
+(3, 19, 'Isiah Pacheco', 'RB', 26.60),
 (4, 2, 'Christian McCaffrey', 'RB', 59.60),
 (5, 5, 'Henry Martin', 'ST', 0.65),
 (6, 2, 'Brock Purdy', 'QB', 251.20),

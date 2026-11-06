@@ -33,7 +33,7 @@ class PropsController
     {
         try {
             $sport = isset($_GET['sport']) && is_string($_GET['sport']) ? trim($_GET['sport']) : null;
-            $limit = isset($_GET['limit']) ? max(1, min(100, (int) $_GET['limit'])) : 50;
+            $limit = isset($_GET['limit']) ? max(1, min(500, (int) $_GET['limit'])) : 300;
 
             $props = $this->propModel->getAll($sport, $limit);
 
