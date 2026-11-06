@@ -46,13 +46,27 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
             </div>
 
             {/* Edge Pill */}
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+            <div
+              className={`mt-3 flex items-center justify-between rounded-xl border p-3 ${
+                prop.calculated_edge >= 0
+                  ? 'border-emerald-500/30 bg-emerald-500/10'
+                  : 'border-rose-500/30 bg-rose-500/10'
+              }`}
+            >
               <div>
-                <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider block">
-                  Valor Matemático Esperado
+                <span
+                  className={`text-[11px] font-mono uppercase tracking-wider block ${
+                    prop.calculated_edge >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {prop.calculated_edge >= 0 ? 'Valor Matemático Esperado' : 'Desventaja Estadística Esperada'}
                 </span>
-                <span className="font-mono text-xl font-black text-edge-positive">
-                  +{prop.calculated_edge}% EDGE (+EV)
+                <span
+                  className={`font-mono text-xl font-black ${
+                    prop.calculated_edge >= 0 ? 'text-edge-positive' : 'text-rose-400'
+                  }`}
+                >
+                  {prop.calculated_edge > 0 ? `+${prop.calculated_edge}%` : `${prop.calculated_edge}%`} EDGE {prop.calculated_edge >= 0 ? '(+EV)' : '(-EV)'}
                 </span>
               </div>
               <div className="text-right">
@@ -186,7 +200,7 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
                 <span>Contexto Defensivo del Rival</span>
               </div>
               <p className="text-slate-300 leading-relaxed text-[11px]">
-                {(prop.opponent_abbreviation || prop.opponent_name || 'El rival')} se ubica como la defensa <strong className="text-white">#{(prop.opponent_rank || prop.opposing_defensive_rank || 16)}</strong> de la liga permitiendo yardas en esta categoría. Este enfrentamiento otorga una ventaja estadística favorable para el pick sugerido.
+                {(prop.opponent_abbreviation || prop.opponent_name || 'El rival')} se ubica como la defensa <strong className="text-white">#{(prop.opponent_rank || prop.opposing_defensive_rank || 16)}</strong> de la liga permitiendo yardas en esta categoría. Este enfrentamiento otorga una {prop.calculated_edge >= 0 ? 'ventaja estadística favorable' : 'desventaja estadística desfavorable'} para el pick sugerido.
               </p>
             </div>
 

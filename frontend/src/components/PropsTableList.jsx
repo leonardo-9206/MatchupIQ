@@ -123,8 +123,14 @@ export default function PropsTableList({ props, onOpenStats, searchQuery }) {
 
                       {/* Value Edge */}
                       <td className="px-4 py-4 text-center font-mono">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-bold text-edge-positive">
-                          +{p.calculated_edge}%
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold ${
+                            p.calculated_edge >= 0
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-edge-positive'
+                              : 'border-rose-500/30 bg-rose-500/10 text-rose-400'
+                          }`}
+                        >
+                          {p.calculated_edge > 0 ? `+${p.calculated_edge}%` : `${p.calculated_edge}%`}
                         </span>
                       </td>
 

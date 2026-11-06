@@ -128,8 +128,11 @@ class PropsController
             $prop['american_odds'] = '-110';
         }
 
-        // Feature the top 3 props by Edge or any prop with an Edge >= 8.7%
+        // Synchronize dynamic edge calculation
         $edgeVal = (float) ($edgeAnalysis['calculated_edge'] ?? $prop['calculated_edge'] ?? 0.0);
+        $prop['calculated_edge'] = $edgeVal;
+
+        // Feature the top 3 props by Edge or any prop with an Edge >= 8.7%
         $prop['is_featured'] = ($index < 3 || $edgeVal >= 8.7);
 
         // Fallbacks for opponent metadata
