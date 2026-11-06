@@ -42,6 +42,7 @@ Thumbs.db
 desktop.ini
 
 # Configuraciones locales de IDEs
+.vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
