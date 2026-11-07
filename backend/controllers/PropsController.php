@@ -237,9 +237,18 @@ class PropsController
                 ];
             }
         } else {
-            // Realistic deterministic fallback based on stat_average & line
-            // Guarantees frontend StatsDrawer.jsx works even before ESPN ingestion
-            $simulatedOpponents = ['vs LAC', '@ DEN', 'vs LV', '@ SF', 'vs BAL'];
+            // Dynamic deterministic fallback based on player ID, team & stat average
+            // Guarantees frontend StatsDrawer.jsx displays realistic distinct opponents if DB logs are missing
+            $teamPool = ['GB', 'CHI', 'MIN', 'DET', 'LAR', 'SF', 'DAL', 'PHI', 'KC', 'BUF', 'BAL', 'MIA', 'NYJ', 'CIN', 'PIT', 'SEA', 'TB', 'ATL', 'HOU', 'IND'];
+            $playerTeam = $prop['team_abbreviation'] ?? 'NFL';
+            $filteredPool = array_values(array_filter($teamPool, fn($t) => $t !== $playerTeam));
+            $poolCount = max(1, count($filteredPool));
+            $simulatedOpponents = [];
+            for ($i = 0; $i < 5; $i++) {
+                $oppIdx = ($playerId * 3 + $i * 2 + 1) % $poolCount;
+                $prefix = ($i % 2 === 0) ? 'vs ' : '@ ';
+                $simulatedOpponents[] = $prefix . $filteredPool[$oppIdx];
+            }
             $multipliers = [1.06, 0.94, 1.12, 0.98, 1.04];
 
             foreach ($simulatedOpponents as $i => $opp) {

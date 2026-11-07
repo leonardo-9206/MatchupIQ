@@ -40,7 +40,7 @@ class EspnApiService
             'espn_id'   => 4361529,
             'name'      => 'Isiah Pacheco',
             'position'  => 'RB',
-            'team_abbr' => 'DET',
+            'team_abbr' => 'KC',
             'stat_type' => 'rushing_yards',
             'espn_stat' => 'rushingYards',
             'line'      => 65.5
