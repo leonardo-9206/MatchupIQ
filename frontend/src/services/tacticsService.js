@@ -3,7 +3,7 @@ import { mockCoverage } from '../mocks/coverageMock.js';
 import { mockRouteTrees } from '../mocks/routeTreeMock.js';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-const TIMEOUT_MS = 6000;
+const TIMEOUT_MS = 40000;
 
 /**
  * Shared GET helper for the /api/tactics/ endpoints.

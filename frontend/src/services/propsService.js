@@ -250,7 +250,7 @@ export async function getProps(sport = null) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for resilient cloud API
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s resilient timeout for cloud database
 
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
