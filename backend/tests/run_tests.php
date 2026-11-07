@@ -280,8 +280,20 @@ class TestRunner
             $this->assert("EspnApiService::parseRecentLogs correctly extracts opponent and stat value",
                 count($parsedLogs) === 1 && ($parsedLogs[0]['stat_value'] ?? 0) === 310.0 && ($parsedLogs[0]['opponent_abbr'] ?? '') === 'LVR');
 
+            // Backup Player 1 real logs to prevent destructive overwriting of curated ESPN logs
+            $testDb = Database::getInstance()->getConnection();
+            $existingMahomesLogs = $testDb->query("SELECT * FROM player_game_logs WHERE player_id = 1")->fetchAll(\PDO::FETCH_ASSOC);
+
             $ingestedCount = $espnService->ingestLogsForPlayer(1, $parsedLogs);
             $this->assert("EspnApiService::ingestLogsForPlayer stores record in player_game_logs", $ingestedCount === 1);
+
+            if (!empty($existingMahomesLogs)) {
+                $testDb->prepare("DELETE FROM player_game_logs WHERE player_id = 1")->execute();
+                $restoreStmt = $testDb->prepare("INSERT INTO player_game_logs (player_id, opponent_abbr, stat_type, stat_value, game_date, is_home) VALUES (?, ?, ?, ?, ?, ?)");
+                foreach ($existingMahomesLogs as $el) {
+                    $restoreStmt->execute([$el['player_id'], $el['opponent_abbr'], $el['stat_type'], $el['stat_value'], $el['game_date'], $el['is_home']]);
+                }
+            }
         }
 
         // ==========================================

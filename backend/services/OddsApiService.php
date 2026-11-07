@@ -353,6 +353,7 @@ class OddsApiService
                             $playerId = (int) $playerRow['player_id'];
                             $statAvg = (float) $playerRow['stat_average'];
                             $playerTeamId = (int) $playerRow['team_id'];
+                            if ($playerTeamId !== $homeTeamId && $playerTeamId !== $awayTeamId) { continue; }
 
                             // Opposing defense ranking for Edge calculation
                             $opposingRank = ($playerTeamId === $homeTeamId) ? $awayDefRank : $homeDefRank;

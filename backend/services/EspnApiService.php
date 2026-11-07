@@ -242,6 +242,15 @@ class EspnApiService
             'stat_type' => 'passing_yards',
             'espn_stat' => 'passingYards',
             'line'      => 230.5
+        ],
+        [
+            'espn_id'   => 4567048,
+            'name'      => 'Kenneth Walker III',
+            'position'  => 'RB',
+            'team_abbr' => 'KC',
+            'stat_type' => 'rushing_yards',
+            'espn_stat' => 'rushingYards',
+            'line'      => 85.5
         ]
     ];
 
