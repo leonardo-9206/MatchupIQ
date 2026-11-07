@@ -53,6 +53,7 @@ class AdminController
             // Force refresh bypasses local cache, hits external API via cURL, and syncs relational props
             $result = $this->oddsService->getOdds($sport, $markets, true);
             $playerPropsSync = $this->oddsService->syncAllLivePlayerProps($sport);
+            $this->espnService->syncDefensiveRankings();
 
             $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 

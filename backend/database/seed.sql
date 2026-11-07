@@ -1,6 +1,6 @@
 -- =====================================================
 -- MatchupIQ — Production Database Seed Script
--- Generated: 2026-11-07 02:41:39
+-- Generated: 2026-11-07 04:45:48
 -- Starters: 77 Curated Stars across all 32 NFL Teams
 -- Games: 17 Real Weekly NFL & Liga MX Matchups
 -- ESPN Game Logs: 380 Verified Real 2026 Game Logs
@@ -15,7 +15,8 @@ TRUNCATE TABLE `users`;
 INSERT INTO `users` (`user_id`, `role_id`, `full_name`, `email`, `password_hash`, `created_at`) VALUES
 (1, 1, 'Admin User', 'admin@matchupiq.com', '$2y$12$VicBUCQZ6UsTPNMrF.BHh.KVXnsq73hntHbnhOaoIJZYbSzBYt0i6', '2026-11-06 19:11:27'),
 (2, 2, 'Rodrigo Vazquez', 'rodrigo@matchupiq.com', '$2y$12$VicBUCQZ6UsTPNMrF.BHh.KVXnsq73hntHbnhOaoIJZYbSzBYt0i6', '2026-11-06 19:11:27'),
-(27, 1, 'Erich Castruita', 'erich@matchupiq.com', '$2y$12$VicBUCQZ6UsTPNMrF.BHh.KVXnsq73hntHbnhOaoIJZYbSzBYt0i6', '2026-11-06 19:11:27');
+(27, 1, 'Erich Castruita', 'erich@matchupiq.com', '$2y$12$VicBUCQZ6UsTPNMrF.BHh.KVXnsq73hntHbnhOaoIJZYbSzBYt0i6', '2026-11-06 19:11:27'),
+(39, 2, 'Integration Tester', 'user_93112419@matchupiq.test', '$2y$12$Mgd7LHvT/SDA8/FKdOaKpuEcIZNAZ9AzWRg.hDbs4irFM59TZdI56', '2026-11-06 19:41:51');
 
 -- =====================================================
 -- Table: roles
@@ -152,7 +153,7 @@ INSERT INTO `players` (`player_id`, `team_id`, `name`, `position`, `stat_average
 (72, 8, 'Drake London', 'WR', 70.00),
 (73, 8, 'Kyle Pitts Sr.', 'TE', 35.40),
 (74, 31, 'Geno Smith', 'QB', 226.00),
-(75, 31, 'Kenneth Walker III', 'RB', 96.00),
+(75, 1, 'Kenneth Walker III', 'RB', 96.00),
 (76, 31, 'DK Metcalf', 'WR', 56.00),
 (77, 31, 'Jaxon Smith-Njigba', 'WR', 116.00);
 
@@ -197,7 +198,7 @@ INSERT INTO `bookmakers` (`bookmaker_id`, `name`, `affiliate_url`) VALUES
 -- =====================================================
 TRUNCATE TABLE `props`;
 INSERT INTO `props` (`prop_id`, `player_id`, `bookmaker_id`, `game_id`, `bet_type`, `line_over`, `odds_over`, `odds_under`, `calculated_edge`, `updated_at`) VALUES
-(1, 1, 1, 1, 'passing_yards', 275.50, 1.95, 1.85, -4.73, '2026-11-06 19:40:33'),
+(1, 1, 1, 1, 'passing_yards', 275.50, 1.95, 1.85, 6.12, '2026-11-06 19:41:51'),
 (2, 2, 3, 1, 'receiving_yards', 52.50, 1.90, 1.90, -5.41, '2026-11-06 19:37:39'),
 (3, 3, 4, 1, 'rushing_yards', 26.00, 1.90, 1.90, '0.01', '2026-11-06 19:37:39'),
 (4, 4, 5, 2, 'rushing_yards', 65.50, 1.90, 1.90, -2.09, '2026-11-06 19:37:39'),
@@ -271,7 +272,7 @@ INSERT INTO `props` (`prop_id`, `player_id`, `bookmaker_id`, `game_id`, `bet_typ
 (72, 72, 3, 4, 'receiving_yards', 68.50, 1.90, 1.90, -0.40, '2026-11-06 19:37:39'),
 (73, 73, 4, 4, 'receiving_yards', 34.50, 1.90, 1.90, -0.21, '2026-11-06 19:37:39'),
 (74, 74, 5, 9, 'passing_yards', 221.50, 1.90, 1.90, -0.83, '2026-11-06 19:37:39'),
-(75, 75, 6, 9, 'rushing_yards', 85.50, 1.90, 1.90, 3.87, '2026-11-06 19:37:39'),
+(75, 75, 6, 1, 'rushing_yards', 85.50, 1.90, 1.90, 4.66, '2026-11-06 21:40:11'),
 (76, 76, 7, 9, 'receiving_yards', 60.50, 1.90, 1.90, -5.17, '2026-11-06 19:37:39'),
 (77, 77, 1, 9, 'receiving_yards', 85.50, 1.90, 1.90, 14.60, '2026-11-06 19:37:39');
 
@@ -280,7 +281,9 @@ INSERT INTO `props` (`prop_id`, `player_id`, `bookmaker_id`, `game_id`, `bet_typ
 -- =====================================================
 TRUNCATE TABLE `bet_tracker`;
 INSERT INTO `bet_tracker` (`bet_id`, `user_id`, `prop_id`, `taken_odds`, `stake_amount`, `status`, `notes`, `created_at`) VALUES
-(1, 2, 1, 1.90, 500.00, 'pending', 'Favorable matchup vs NYJ secondary', '2026-11-06 19:37:39');
+(1, 2, 1, 1.90, 500.00, 'pending', 'Favorable matchup vs NYJ secondary', '2026-11-06 19:37:39'),
+(4, 1, 77, 1.90, 80.00, 'pending', '', '2026-11-06 21:38:35'),
+(5, 1, 17, 1.90, 120.00, 'pending', '', '2026-11-06 21:38:47');
 
 -- =====================================================
 -- Table: player_heatmaps
@@ -316,7 +319,37 @@ INSERT INTO `player_heatmaps` (`heatmap_id`, `player_id`, `field_zone`, `attempt
 (27, 39, 'left_tackle', 38, 210, 63.16),
 (28, 39, 'middle', 60, 285, 55.00),
 (29, 39, 'right_tackle', 40, 220, 62.50),
-(30, 39, 'right_end', 22, 125, 54.55);
+(30, 39, 'right_end', 22, 125, 54.55),
+(1361, 75, 'left_end', 32, 210, 62.50),
+(1362, 75, 'left_tackle', 48, 260, 66.70),
+(1363, 75, 'middle', 75, 340, 56.00),
+(1364, 75, 'right_tackle', 40, 220, 60.00),
+(1365, 75, 'right_end', 25, 130, 52.00),
+(1366, 10, 'left_end', 35, 230, 65.70),
+(1367, 10, 'left_tackle', 50, 290, 68.00),
+(1368, 10, 'middle', 85, 410, 58.80),
+(1369, 10, 'right_tackle', 45, 240, 62.20),
+(1370, 10, 'right_end', 28, 145, 53.60),
+(1371, 71, 'left_end', 30, 195, 63.30),
+(1372, 71, 'left_tackle', 45, 250, 64.40),
+(1373, 71, 'middle', 65, 310, 55.40),
+(1374, 71, 'right_tackle', 38, 205, 57.90),
+(1375, 71, 'right_end', 22, 115, 50.00),
+(1376, 30, 'left_end', 28, 175, 60.70),
+(1377, 30, 'left_tackle', 42, 230, 61.90),
+(1378, 30, 'middle', 70, 320, 54.30),
+(1379, 30, 'right_tackle', 36, 190, 58.30),
+(1380, 30, 'right_end', 20, 105, 50.00),
+(1381, 36, 'left_end', 34, 225, 64.70),
+(1382, 36, 'left_tackle', 46, 275, 67.40),
+(1383, 36, 'middle', 80, 390, 57.50),
+(1384, 36, 'right_tackle', 42, 230, 61.90),
+(1385, 36, 'right_end', 26, 135, 53.80),
+(1386, 13, 'left_end', 26, 160, 57.70),
+(1387, 13, 'left_tackle', 38, 210, 60.50),
+(1388, 13, 'middle', 60, 280, 53.30),
+(1389, 13, 'right_tackle', 34, 180, 55.90),
+(1390, 13, 'right_end', 18, 95, 50.00);
 
 -- =====================================================
 -- Table: player_game_logs
