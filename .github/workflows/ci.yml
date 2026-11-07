@@ -1,0 +1,92 @@
+name: MatchupIQ CI/CD Pipeline
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  backend-tests:
+    name: Backend Integration Tests & Security
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: matchupiq_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, curl, mbstring, json
+          coverage: none
+
+      - name: Import Database Schema and Seed Data
+        run: |
+          mysql -h 127.0.0.1 -u root -proot matchupiq_db < backend/database/schema.sql
+          mysql -h 127.0.0.1 -u root -proot matchupiq_db < backend/database/seed.sql
+          if [ -f backend/database/migrations/20261023_create_odds_cache.sql ]; then
+            mysql -h 127.0.0.1 -u root -proot matchupiq_db < backend/database/migrations/20261023_create_odds_cache.sql
+          fi
+          if [ -f backend/database/migrations/20261105_create_player_game_logs.sql ]; then
+            mysql -h 127.0.0.1 -u root -proot matchupiq_db < backend/database/migrations/20261105_create_player_game_logs.sql
+          fi
+
+      - name: Configure Environment Variables
+        run: |
+          cat << 'EOF' > backend/.env
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_NAME=matchupiq_db
+          DB_USER=root
+          DB_PASS=root
+          ODDS_API_KEY=test_odds_key_ci
+          ODDS_AUTO_FETCH=false
+          EOF
+
+      - name: Launch PHP Built-in Server
+        run: |
+          php -S 127.0.0.1:8000 -t backend &
+          sleep 3
+
+      - name: Verify Health Check Endpoint
+        run: |
+          curl -f http://127.0.0.1:8000/api/health-check.php
+
+      - name: Execute Automated Integration Test Suite
+        run: |
+          php backend/tests/run_tests.php http://127.0.0.1:8000
+
+  frontend-build:
+    name: Frontend Build & Compilation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Vite Build Check
+        working-directory: frontend
+        run: npm run build

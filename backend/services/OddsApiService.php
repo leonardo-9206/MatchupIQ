@@ -233,6 +233,50 @@ class OddsApiService
                 $gameRow = $fuzzyStmt->fetch();
             }
 
+            // Dynamic schedule sync: if game not found in calendar, insert it from real event payload
+            if (!$gameRow) {
+                $teamLookupSql = "SELECT team_id, defensive_rank FROM teams 
+                                  WHERE LOWER(name) = LOWER(:tname) OR LOWER(abbreviation) = LOWER(:tabbr) 
+                                  LIMIT 1";
+                $tLookupStmt = $this->db->prepare($teamLookupSql);
+
+                $tLookupStmt->execute([':tname' => $homeTeam, ':tabbr' => $homeTeam]);
+                $homeTeamRow = $tLookupStmt->fetch();
+
+                $tLookupStmt->execute([':tname' => $awayTeam, ':tabbr' => $awayTeam]);
+                $awayTeamRow = $tLookupStmt->fetch();
+
+                if ($homeTeamRow && $awayTeamRow) {
+                    $homeTeamId = (int) $homeTeamRow['team_id'];
+                    $awayTeamId = (int) $awayTeamRow['team_id'];
+                    $homeDefRank = (int) $homeTeamRow['defensive_rank'];
+                    $awayDefRank = (int) $awayTeamRow['defensive_rank'];
+
+                    $gameDateRaw = $event['commence_time'] ?? '';
+                    $gameDate = strlen($gameDateRaw) >= 19 
+                        ? str_replace(['T', 'Z'], [' ', ''], substr($gameDateRaw, 0, 19)) 
+                        : date('Y-m-d H:i:s', time() + 86400);
+
+                    $insertGameSql = "INSERT INTO games (sport_id, home_team_id, away_team_id, game_date) 
+                                      VALUES (1, :home_id, :away_id, :gdate)";
+                    $insertGameStmt = $this->db->prepare($insertGameSql);
+                    $insertGameStmt->execute([
+                        ':home_id' => $homeTeamId,
+                        ':away_id' => $awayTeamId,
+                        ':gdate'   => $gameDate
+                    ]);
+                    $gameId = (int) $this->db->lastInsertId();
+
+                    $gameRow = [
+                        'game_id'       => $gameId,
+                        'home_team_id'  => $homeTeamId,
+                        'away_team_id'  => $awayTeamId,
+                        'home_def_rank' => $homeDefRank,
+                        'away_def_rank' => $awayDefRank
+                    ];
+                }
+            }
+
             if (!$gameRow) {
                 continue;
             }
@@ -294,9 +338,22 @@ class OddsApiService
                                 continue;
                             }
 
+                            // Enforce strict position-to-bet_type standardization (QB = passing, RB = rushing, WR/TE = receiving)
+                            $playerPos = strtoupper(trim($playerRow['position'] ?? ''));
+                            $expectedBetType = match ($playerPos) {
+                                'QB'       => 'passing_yards',
+                                'RB'       => 'rushing_yards',
+                                'WR', 'TE' => 'receiving_yards',
+                                default    => null
+                            };
+                            if ($expectedBetType !== null && $betType !== $expectedBetType) {
+                                continue;
+                            }
+
                             $playerId = (int) $playerRow['player_id'];
                             $statAvg = (float) $playerRow['stat_average'];
                             $playerTeamId = (int) $playerRow['team_id'];
+                            if ($playerTeamId !== $homeTeamId && $playerTeamId !== $awayTeamId) { continue; }
 
                             // Opposing defense ranking for Edge calculation
                             $opposingRank = ($playerTeamId === $homeTeamId) ? $awayDefRank : $homeDefRank;
@@ -374,6 +431,54 @@ class OddsApiService
     /**
      * Resolves bookmaker ID by matching existing names or inserting a new bookmaker.
      */
+
+    /**
+     * Synchronizes live player props (rushing, passing, receiving yards) for upcoming games.
+     * Hits event odds endpoints on The Odds API and updates relational props.
+     */
+    public function syncAllLivePlayerProps(string $sportKey = 'americanfootball_nfl'): array
+    {
+        $eventsUrl = "{$this->baseUrl}/sports/{$sportKey}/events?apiKey={$this->apiKey}";
+        $eventsRes = $this->executeCurl($eventsUrl);
+
+        if (!$eventsRes['success'] || !is_array($eventsRes['data'])) {
+            return ['updated' => 0, 'inserted' => 0, 'events_processed' => 0];
+        }
+
+        $events = $eventsRes['data'];
+        $now = time();
+        $targetWindow = 86400 * 7; // Next 7 days
+        $markets = 'player_rush_yds,player_pass_yds,player_reception_yds';
+
+        $totalUpdated = 0;
+        $totalInserted = 0;
+        $eventsProcessed = 0;
+
+        foreach ($events as $event) {
+            $commenceTime = strtotime($event['commence_time'] ?? '');
+            if ($commenceTime < $now - 3600 || $commenceTime > $now + $targetWindow) {
+                continue;
+            }
+
+            $eventId = $event['id'];
+            $propUrl = "{$this->baseUrl}/sports/{$sportKey}/events/{$eventId}/odds?apiKey={$this->apiKey}&regions=us&markets={$markets}";
+            $propRes = $this->executeCurl($propUrl);
+
+            if ($propRes['success'] && is_array($propRes['data'])) {
+                $syncStats = $this->syncOddsToProps([$propRes['data']]);
+                $totalUpdated += $syncStats['updated'];
+                $totalInserted += $syncStats['inserted'];
+                $eventsProcessed++;
+            }
+        }
+
+        return [
+            'updated'          => $totalUpdated,
+            'inserted'         => $totalInserted,
+            'events_processed' => $eventsProcessed
+        ];
+    }
+
     private function resolveBookmakerId(string $name): int
     {
         $stmt = $this->db->prepare("SELECT bookmaker_id FROM bookmakers WHERE LOWER(name) = LOWER(:name) LIMIT 1");
@@ -450,20 +555,20 @@ class OddsApiService
     ): string {
         $checkStmt = $this->db->prepare("SELECT prop_id FROM props 
             WHERE player_id = :player_id 
-              AND bookmaker_id = :bookmaker_id 
-              AND game_id = :game_id 
               AND bet_type = :bet_type 
+            ORDER BY (bookmaker_id = :bookmaker_id) DESC, prop_id ASC
             LIMIT 1");
         $checkStmt->execute([
             ':player_id'    => $playerId,
-            ':bookmaker_id' => $bookmakerId,
-            ':game_id'      => $gameId,
-            ':bet_type'     => $betType
+            ':bet_type'     => $betType,
+            ':bookmaker_id' => $bookmakerId
         ]);
         $existing = $checkStmt->fetch();
 
         if ($existing) {
             $update = $this->db->prepare("UPDATE props SET 
+                bookmaker_id = :bookmaker_id,
+                game_id = :game_id,
                 line_over = :line_over,
                 odds_over = :odds_over,
                 odds_under = :odds_under,
@@ -471,6 +576,8 @@ class OddsApiService
                 updated_at = NOW()
                 WHERE prop_id = :prop_id");
             $update->execute([
+                ':bookmaker_id'    => $bookmakerId,
+                ':game_id'         => $gameId,
                 ':line_over'       => $lineOver,
                 ':odds_over'       => $oddsOver,
                 ':odds_under'      => $oddsUnder,

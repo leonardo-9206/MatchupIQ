@@ -11,6 +11,7 @@ import AddBetModal from './components/AddBetModal.jsx';
 import { getProps } from './services/propsService.js';
 import { checkSession, logoutUser } from './services/authService.js';
 import { getBets, createBet, updateBet, deleteBet } from './services/trackerService.js';
+import { refreshAdminOdds } from './services/adminService.js';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -24,6 +25,10 @@ export default function App() {
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
   const [heatmapPlayerId, setHeatmapPlayerId] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'catalog' | 'tracker'
+
+  // Admin sync states
+  const [isRefreshingOdds, setIsRefreshingOdds] = useState(false);
+  const [refreshSuccessMsg, setRefreshSuccessMsg] = useState('');
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState(null);
@@ -53,31 +58,38 @@ export default function App() {
       setBets(res.bets);
     }
     loadBets();
-  }, [currentUser]);
+  }, []);
 
   // Load props from asynchronous service (Fetch API)
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      setLoading(true);
-      try {
-        const res = await getProps(selectedSport);
-        if (isMounted) {
-          setPropsData(res.props);
-          setDataSource(res.source);
-        }
-      } catch (err) {
-        console.error('Error fetching props:', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await getProps(selectedSport);
+      setPropsData(res.props);
+      setDataSource(res.source);
+    } catch (err) {
+      console.error('Error fetching props:', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadData();
-    return () => {
-      isMounted = false;
-    };
   }, [selectedSport]);
+
+  // Admin Odds Refresh Action
+  const handleRefreshOdds = async () => {
+    setIsRefreshingOdds(true);
+    setRefreshSuccessMsg('');
+    const res = await refreshAdminOdds('americanfootball_nfl');
+    setIsRefreshingOdds(false);
+    if (res.success) {
+      setRefreshSuccessMsg(res.message);
+      await loadData(); // Reload props with fresh odds
+      setTimeout(() => setRefreshSuccessMsg(''), 4000);
+    }
+  };
 
   // Client-side real-time filter by search query
   const filteredProps = useMemo(() => {
@@ -93,6 +105,22 @@ export default function App() {
       );
     });
   }, [propsData, searchQuery]);
+
+  // NFL athletes that appear in the loaded props, for the tactical modal's player selector
+  const tacticalPlayers = useMemo(() => {
+    const byId = new Map();
+    for (const p of propsData) {
+      if (p.sport_slug === 'nfl' && !byId.has(p.player_id)) {
+        byId.set(p.player_id, {
+          player_id: p.player_id,
+          name: p.player_name,
+          position: p.player_position,
+          team: p.team_abbreviation,
+        });
+      }
+    }
+    return [...byId.values()];
+  }, [propsData]);
 
   const handleOpenStats = (prop) => {
     setSelectedProp(prop);
@@ -175,7 +203,7 @@ export default function App() {
           </main>
         ) : (
           <>
-            {/* Hero & Real-time Filter Bar */}
+            {/* Hero & Real-time Filter Bar with Live Sync Button */}
             <HeroFilters
               selectedSport={selectedSport}
               onSelectSport={setSelectedSport}
@@ -183,6 +211,10 @@ export default function App() {
               onSearchChange={setSearchQuery}
               totalPropsCount={filteredProps.length}
               featuredCount={filteredProps.filter((p) => p.is_featured).length}
+              isAdmin={currentUser?.role === 'admin'}
+              isRefreshingOdds={isRefreshingOdds}
+              onRefreshOdds={handleRefreshOdds}
+              refreshSuccessMsg={refreshSuccessMsg}
             />
 
             {/* Loading Indicator */}
@@ -230,6 +262,7 @@ export default function App() {
       <TacticalHeatmapModal
         isOpen={isHeatmapOpen}
         selectedPlayerId={heatmapPlayerId}
+        players={tacticalPlayers}
         onClose={() => setIsHeatmapOpen(false)}
       />
 
@@ -270,4 +303,3 @@ export default function App() {
     </div>
   );
 }
-

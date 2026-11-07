@@ -8,8 +8,11 @@ const TIMEOUT_MS = 2000;
 /**
  * Shared GET helper for the /api/tactics/ endpoints.
  * Every endpoint answers { status: 'success', data: { player, <listKey>: [...], summary } }.
- * Returns that `data` object, or null if the backend is offline, times out or has no rows,
- * so each caller can decide which mock to use instead.
+ *
+ * Returns one of:
+ *   { reachable: true,  data }        -> the backend has rows for this player
+ *   { reachable: true,  data: null }  -> the backend answered but has no rows (e.g. 404 "No ... data found")
+ *   { reachable: false, data: null }  -> offline, timeout or server error (5xx): the caller uses its mock
  */
 async function fetchTactics(endpoint, playerId, listKey) {
   const url = `${BACKEND_URL}/api/tactics/${endpoint}?player_id=${encodeURIComponent(playerId)}`;
@@ -22,59 +25,61 @@ async function fetchTactics(endpoint, playerId, listKey) {
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
 
+    if (res.status >= 500) {
+      return { reachable: false, data: null };
+    }
     if (res.ok) {
       const json = await res.json();
       if (json?.status === 'success' && Array.isArray(json.data?.[listKey]) && json.data[listKey].length > 0) {
-        return json.data;
+        return { reachable: true, data: json.data };
       }
     }
+    return { reachable: true, data: null };
   } catch {
-    // Backend offline or request aborted: the caller falls back to its mock
+    // Backend offline or request aborted
+    return { reachable: false, data: null };
   }
-
-  return null;
 }
 
 /**
- * Rushing zone heatmap of a player (Joao's endpoint):
- * GET /api/tactics/heatmap.php?player_id=3
+ * Turns the helper's answer into the shape the hooks expect.
+ * Mock rows are only used when the backend can't be reached: if it answers that a real
+ * athlete has no data, we show an empty state instead of someone else's made-up numbers.
+ */
+async function loadTactics(endpoint, playerId, listKey, mock) {
+  const { reachable, data } = await fetchTactics(endpoint, playerId, listKey);
+  if (data) {
+    return { source: 'backend', [listKey]: data[listKey], player: data.player, summary: data.summary };
+  }
+  if (reachable) {
+    return { source: 'backend', [listKey]: [], player: null, summary: null };
+  }
+  return { source: 'mock', [listKey]: mock[playerId] ?? [], player: null, summary: null };
+}
+
+/**
+ * Rushing zone heatmap of a player: GET /api/tactics/heatmap.php?player_id=3
  *
  * @returns {Promise<{ source: 'backend' | 'mock', zones: Array, player: object | null, summary: object | null }>}
  */
-export async function getPlayerHeatmap(playerId) {
-  const data = await fetchTactics('heatmap.php', playerId, 'zones');
-  if (data) {
-    return { source: 'backend', zones: data.zones, player: data.player, summary: data.summary };
-  }
-  return { source: 'mock', zones: mockHeatmaps[playerId] ?? [], player: null, summary: null };
+export function getPlayerHeatmap(playerId) {
+  return loadTactics('heatmap.php', playerId, 'zones', mockHeatmaps);
 }
 
 /**
- * Man vs Zone coverage splits of a receiver (Joao's endpoint):
- * GET /api/tactics/coverage.php?player_id=2
+ * Man vs Zone coverage splits of a receiver: GET /api/tactics/coverage.php?player_id=2
  *
  * @returns {Promise<{ source: 'backend' | 'mock', splits: Array, player: object | null, summary: object | null }>}
  */
-export async function getPlayerCoverage(playerId) {
-  const data = await fetchTactics('coverage.php', playerId, 'splits');
-  if (data) {
-    return { source: 'backend', splits: data.splits, player: data.player, summary: data.summary };
-  }
-  return { source: 'mock', splits: mockCoverage[playerId] ?? [], player: null, summary: null };
+export function getPlayerCoverage(playerId) {
+  return loadTactics('coverage.php', playerId, 'splits', mockCoverage);
 }
 
 /**
- * Route tree of a receiver.
- * There is no table or endpoint for routes yet, so this always uses the mock for now.
- * The proposed contract is GET /api/tactics/routes.php?player_id=2 -> data.routes (see routeTreeMock.js);
- * once the backend exists, this function already knows how to read it.
+ * Route tree of a receiver: GET /api/tactics/routes.php?player_id=2
  *
  * @returns {Promise<{ source: 'backend' | 'mock', routes: Array, player: object | null, summary: object | null }>}
  */
-export async function getPlayerRouteTree(playerId) {
-  const data = await fetchTactics('routes.php', playerId, 'routes');
-  if (data) {
-    return { source: 'backend', routes: data.routes, player: data.player, summary: data.summary };
-  }
-  return { source: 'mock', routes: mockRouteTrees[playerId] ?? [], player: null, summary: null };
+export function getPlayerRouteTree(playerId) {
+  return loadTactics('routes.php', playerId, 'routes', mockRouteTrees);
 }

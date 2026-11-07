@@ -5,72 +5,90 @@ import RouteTree, { ROUTE_METRICS } from './Tactics/RouteTree.jsx';
 import CoverageSplits from './Tactics/CoverageSplits.jsx';
 import { mockPlayers } from '../mocks/heatmapMock.js';
 
-const TACTICAL_VIEWS = [
-  { key: 'heatmap', label: 'Rushing Heatmap', icon: Flame, rusherOnly: true },
-  { key: 'routes', label: 'Route Tree', icon: GitBranch, rusherOnly: false },
-  { key: 'coverage', label: 'Man vs Zone', icon: Shield, rusherOnly: false },
-];
+const TACTICAL_VIEWS = {
+  heatmap: { label: 'Rushing Heatmap', icon: Flame },
+  routes: { label: 'Route Tree', icon: GitBranch },
+  coverage: { label: 'Man vs Zone', icon: Shield },
+};
 
-function resolveValidPlayerId(candidateId) {
-  const numericId = Number(candidateId);
-  if (mockPlayers.some((p) => p.player_id === numericId)) {
-    return numericId;
-  }
-  return mockPlayers[0]?.player_id ?? 3;
-}
+// Which tactical views make sense for each position:
+// RBs run and catch, WRs/TEs only catch, QBs only have designed runs/scrambles.
+export const POSITION_VIEWS = {
+  RB: ['heatmap', 'routes', 'coverage'],
+  WR: ['routes', 'heatmap', 'coverage'],
+  TE: ['routes', 'heatmap', 'coverage'],
+  QB: ['heatmap'],
+};
 
-export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId }) {
-  const [playerId, setPlayerId] = useState(() => resolveValidPlayerId(selectedPlayerId));
+const POSITION_COPY = {
+  RB: {
+    badge: 'RB: Rushing + Passing Maps',
+    description: 'Desglose integral de acarreos por carril, árbol de rutas y coberturas defensivas',
+  },
+  WR: {
+    badge: 'WR: Route Tree & Receiving Zones',
+    description: 'Análisis aéreo de árbol de rutas (Route Tree) y rendimiento contra coberturas Man vs Zone',
+  },
+  TE: {
+    badge: 'TE: Route Tree & Receiving Zones',
+    description: 'Análisis aéreo de árbol de rutas (Route Tree) y rendimiento contra coberturas Man vs Zone',
+  },
+  QB: {
+    badge: 'QB: Designed Runs Map',
+    description: 'Distribución de acarreos del mariscal de campo por carril (jugadas diseñadas y scrambles)',
+  },
+};
+
+/**
+ * Tactical modal opened from a PropCard / StatsDrawer.
+ *
+ * @param players          NFL athletes available in the dashboard: [{ player_id, name, position, team }].
+ *                         Falls back to the local mock roster when the parent doesn't send any.
+ * @param selectedPlayerId Athlete to show when the modal opens (the prop's player_id).
+ */
+export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId, players }) {
+  const roster = players?.length ? players : mockPlayers;
+  const [playerId, setPlayerId] = useState(() => Number(selectedPlayerId ?? roster[0]?.player_id));
   const [activeView, setActiveView] = useState('heatmap');
   const [heatmapMetric, setHeatmapMetric] = useState('attempts');
   const [routeMetric, setRouteMetric] = useState('catch_rate');
 
-  // Keep playerId in sync whenever selectedPlayerId changes
+  // Follow the athlete of the card the user clicked
   useEffect(() => {
     if (selectedPlayerId != null) {
-      setPlayerId(resolveValidPlayerId(selectedPlayerId));
+      setPlayerId(Number(selectedPlayerId));
     }
   }, [selectedPlayerId]);
 
-  const selectedPlayer =
-    mockPlayers.find((p) => p.player_id === Number(playerId)) ?? mockPlayers[0];
-  const playerPosition = selectedPlayer?.position ?? 'RB';
-  const isRunningBack = playerPosition === 'RB';
-
-  // Position-based view filtering:
-  // RBs have rushing + passing maps (all 3 views); TE/WR only have passing & coverage maps (2 views).
-  const availableViews = TACTICAL_VIEWS.filter((v) => isRunningBack || !v.rusherOnly);
-
-  // Automatically switch out of 'heatmap' if the user selects a TE/WR
-  useEffect(() => {
-    if (!isRunningBack && activeView === 'heatmap') {
-      setActiveView('routes');
-    }
-  }, [isRunningBack, activeView]);
-
-  const currentView = !isRunningBack && activeView === 'heatmap' ? 'routes' : activeView;
-
   if (!isOpen) return null;
 
-  const activeMetrics =
-    currentView === 'heatmap' ? METRICS : currentView === 'routes' ? ROUTE_METRICS : null;
-  const currentMetricValue = currentView === 'heatmap' ? heatmapMetric : routeMetric;
-  const handleSelectMetric = (key) => {
-    if (currentView === 'heatmap') {
-      setHeatmapMetric(key);
-    } else if (currentView === 'routes') {
-      setRouteMetric(key);
-    }
+  // A synced athlete may not be in the roster yet: keep showing them instead of switching to someone else
+  const selectedPlayer = roster.find((p) => p.player_id === playerId) ?? {
+    player_id: playerId,
+    name: `Player #${playerId}`,
+    position: null,
+    team: '—',
   };
+  const options = roster.includes(selectedPlayer) ? roster : [selectedPlayer, ...roster];
+
+  const position = selectedPlayer.position;
+  const availableViews = POSITION_VIEWS[position] ?? [];
+  // If the new athlete doesn't have the current tab (e.g. RB -> WR on the heatmap), use their first tab
+  const currentView = availableViews.includes(activeView) ? activeView : availableViews[0];
+  const copy = POSITION_COPY[position];
+
+  const activeMetrics = currentView === 'heatmap' ? METRICS : currentView === 'routes' ? ROUTE_METRICS : null;
+  const currentMetricValue = currentView === 'heatmap' ? heatmapMetric : routeMetric;
+  const handleSelectMetric = currentView === 'heatmap' ? setHeatmapMetric : setRouteMetric;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="tactical-modal-title">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/85 backdrop-blur-md" onClick={onClose} />
 
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
         <div className="relative w-full max-w-4xl rounded-2xl border border-sky-500/30 bg-[#070B16] p-6 shadow-2xl">
-          
+
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
             <div className="flex items-center gap-2.5">
@@ -79,30 +97,31 @@ export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-display text-xl font-bold text-white">
+                  <h3 id="tactical-modal-title" className="font-display text-xl font-bold text-white">
                     Mapa Táctico del Campo NFL
                   </h3>
-                  <span
-                    data-testid="position-scope-badge"
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold border ${
-                      isRunningBack
-                        ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    }`}
-                  >
-                    {isRunningBack ? 'RB: Rushing + Passing Maps' : 'TE/WR: Passing & Coverage Maps'}
-                  </span>
+                  {copy && (
+                    <span
+                      data-testid="position-scope-badge"
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold border ${
+                        position === 'RB'
+                          ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      }`}
+                    >
+                      {copy.badge}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-400 font-sans">
-                  {isRunningBack
-                    ? 'Desglose integral de acarreos por carril, árbol de rutas y coberturas defensivas'
-                    : 'Análisis aéreo de árbol de rutas (Route Tree) y rendimiento contra coberturas Man vs Zone'}
+                  {copy?.description ?? 'Mapas tácticos disponibles para QB, RB, WR y TE'}
                 </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
+              aria-label="Cerrar mapa táctico"
               className="rounded-lg p-1.5 text-slate-400 hover:bg-surface-elevated hover:text-white transition-all"
             >
               <X className="h-5 w-5" />
@@ -125,45 +144,53 @@ export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId
                   onChange={(e) => setPlayerId(Number(e.target.value))}
                   className="rounded-xl border border-slate-700 bg-[#0D1527] px-3.5 py-2 text-xs font-semibold text-slate-100 focus:border-sky-500 focus:outline-none"
                 >
-                  {mockPlayers.map((p) => (
+                  {options.map((p) => (
                     <option key={p.player_id} value={p.player_id}>
-                      {p.name} ({p.team} · {p.position})
+                      {p.name} ({p.team} · {p.position ?? '?'})
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Tactical View Switcher filtered by position */}
-              <div>
-                <label className="block text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
-                  Vista Táctica ({playerPosition})
-                </label>
-                <div className="flex rounded-xl border border-slate-700 bg-[#0D1527] p-1">
-                  {availableViews.map(({ key, label, icon: Icon }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setActiveView(key)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                        currentView === key
-                          ? 'bg-sky-500 text-slate-950 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      <span>{label}</span>
-                    </button>
-                  ))}
+              {availableViews.length > 0 && (
+                <div>
+                  <span className="block text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                    Vista Táctica ({position})
+                  </span>
+                  <div className="flex rounded-xl border border-slate-700 bg-[#0D1527] p-1" role="tablist">
+                    {availableViews.map((key) => {
+                      const { label: defaultLabel, icon: Icon } = TACTICAL_VIEWS[key];
+                      const label = key === 'heatmap' && (position === 'WR' || position === 'TE') ? 'Receiving Zones' : defaultLabel;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="tab"
+                          aria-selected={currentView === key}
+                          onClick={() => setActiveView(key)}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                            currentView === key
+                              ? 'bg-sky-500 text-slate-950 font-bold shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Metric Selector (applicable to Rushing Heatmap and Route Tree) */}
             {activeMetrics && (
               <div>
-                <label className="block text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                <span className="block text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
                   Métrica de Análisis
-                </label>
+                </span>
                 <div className="flex rounded-xl border border-slate-700 bg-[#0D1527] p-1">
                   {Object.entries(activeMetrics).map(([key, { label }]) => (
                     <button
@@ -186,14 +213,13 @@ export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId
 
           {/* Tactical Visual Container */}
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-[#050811] p-4 relative">
-            {currentView === 'heatmap' && isRunningBack && (
-              <FieldHeatmap playerId={playerId} metric={heatmapMetric} />
-            )}
-            {currentView === 'routes' && (
-              <RouteTree playerId={playerId} metric={routeMetric} />
-            )}
-            {currentView === 'coverage' && (
-              <CoverageSplits playerId={playerId} />
+            {currentView === 'heatmap' && <FieldHeatmap playerId={playerId} metric={heatmapMetric} />}
+            {currentView === 'routes' && <RouteTree playerId={playerId} metric={routeMetric} />}
+            {currentView === 'coverage' && <CoverageSplits playerId={playerId} />}
+            {!currentView && (
+              <p className="py-16 text-center text-sm text-slate-400">
+                No hay mapas tácticos para la posición {position ?? 'de este atleta'}.
+              </p>
             )}
           </div>
 
@@ -205,10 +231,8 @@ export default function TacticalHeatmapModal({ isOpen, onClose, selectedPlayerId
                 Visualización basada en métricas tácticas de la NFL (Zonas de Acarreo, Route Tree y Esquemas Man vs Zone).
               </span>
             </div>
-            {!isRunningBack && (
-              <span className="text-emerald-400">
-                Mapa de acarreos deshabilitado para receptores ({playerPosition})
-              </span>
+            {(position === 'WR' || position === 'TE') && (
+              <span className="text-emerald-400">Mapa de acarreos deshabilitado para receptores ({position})</span>
             )}
           </div>
 

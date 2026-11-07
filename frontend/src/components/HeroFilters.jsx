@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, SlidersHorizontal, CheckCircle2, TrendingUp, Trophy } from 'lucide-react';
+import { Search, TrendingUp, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import Button from './common/Button.jsx';
 
 export default function HeroFilters({
   selectedSport,
@@ -8,6 +9,10 @@ export default function HeroFilters({
   onSearchChange,
   totalPropsCount,
   featuredCount,
+  isAdmin = false,
+  isRefreshingOdds = false,
+  onRefreshOdds,
+  refreshSuccessMsg = '',
 }) {
   return (
     <section className="relative overflow-hidden pt-8 pb-6 border-b border-slate-800/60 bg-gradient-to-b from-[#070B16] to-[#050811]">
@@ -31,7 +36,7 @@ export default function HeroFilters({
             Identifica discrepancias en líneas de <strong className="text-white">NFL</strong> y <strong className="text-white">Liga MX</strong> comparando exclusivamente los sportsbooks líderes de Estados Unidos.
           </p>
 
-          {/* USA Sportsbooks pills */}
+          {/* USA Sportsbooks pills & Admin sync button */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-400 font-mono">
             <span className="text-slate-500 text-[11px] uppercase tracking-wider">Momios en vivo de USA:</span>
             <span className="rounded-md border border-slate-800 bg-surface-1 px-2.5 py-1 text-slate-300 flex items-center gap-1.5">
@@ -46,6 +51,27 @@ export default function HeroFilters({
             <span className="rounded-md border border-slate-800 bg-surface-1 px-2.5 py-1 text-slate-300 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[#257551]" /> Caesars
             </span>
+          </div>
+
+          {/* Admin Live Sync Trigger */}
+          <div className="mt-4 flex flex-col items-center justify-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              isLoading={isRefreshingOdds}
+              onClick={onRefreshOdds}
+              className="border-brand-cyan/40 hover:border-brand-cyan bg-[#0A1020] text-brand-cyan hover:bg-brand-cyan/15 text-xs font-mono font-bold"
+              title="Sincroniza cuotas de The Odds API y actualiza la caché local (Rol Admin)"
+            >
+              <span>{isRefreshingOdds ? 'Sincronizando The Odds API...' : '⚡ Actualizar Cuotas en Vivo (Admin)'}</span>
+            </Button>
+            {refreshSuccessMsg && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-edge-positive animate-fade-in">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {refreshSuccessMsg}
+              </span>
+            )}
           </div>
         </div>
 

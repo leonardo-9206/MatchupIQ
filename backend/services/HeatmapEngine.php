@@ -226,7 +226,7 @@ class HeatmapEngine
     public function buildRouteTreeBreakdown(array $player): array
     {
         $playerId = (int) ($player['player_id'] ?? 0);
-        $rawRoutes = $this->getSynchronizedRouteProfile($playerId);
+        $rawRoutes = $this->getSynchronizedRouteProfile($playerId, $player);
 
         if (empty($rawRoutes)) {
             return [
@@ -311,7 +311,7 @@ class HeatmapEngine
      * @param int $playerId
      * @return array
      */
-    private function getSynchronizedRouteProfile(int $playerId): array
+    private function getSynchronizedRouteProfile(int $playerId, ?array $player = null): array
     {
         $profiles = [
             // Travis Kelce (TE - Kansas City Chiefs)
@@ -345,6 +345,71 @@ class HeatmapEngine
             ],
         ];
 
-        return $profiles[$playerId] ?? [];
+        if (isset($profiles[$playerId])) {
+            return $profiles[$playerId];
+        }
+
+        $position = strtoupper((string) ($player['position'] ?? 'WR'));
+        $statAvg = (float) ($player['stat_average'] ?? 55.0);
+
+        if ($position === 'WR') {
+            $routeTemplates = [
+                ['type' => 'slant',    'share' => 0.18, 'base_rate' => 76.0, 'yds_per_rec' => 11.2],
+                ['type' => 'curl',     'share' => 0.16, 'base_rate' => 74.0, 'yds_per_rec' => 10.5],
+                ['type' => 'out',      'share' => 0.15, 'base_rate' => 69.0, 'yds_per_rec' => 9.8],
+                ['type' => 'dig',      'share' => 0.14, 'base_rate' => 72.0, 'yds_per_rec' => 13.5],
+                ['type' => 'go',       'share' => 0.12, 'base_rate' => 48.0, 'yds_per_rec' => 24.0],
+                ['type' => 'post',     'share' => 0.10, 'base_rate' => 58.0, 'yds_per_rec' => 18.5],
+                ['type' => 'corner',   'share' => 0.06, 'base_rate' => 54.0, 'yds_per_rec' => 17.0],
+                ['type' => 'comeback', 'share' => 0.05, 'base_rate' => 67.0, 'yds_per_rec' => 12.0],
+                ['type' => 'flat',     'share' => 0.04, 'base_rate' => 84.0, 'yds_per_rec' => 6.5],
+            ];
+            $totalBaseTargets = max(35, (int) round($statAvg * 0.95));
+        } elseif ($position === 'TE') {
+            $routeTemplates = [
+                ['type' => 'curl',     'share' => 0.22, 'base_rate' => 79.0, 'yds_per_rec' => 9.5],
+                ['type' => 'dig',      'share' => 0.18, 'base_rate' => 75.0, 'yds_per_rec' => 12.0],
+                ['type' => 'flat',     'share' => 0.16, 'base_rate' => 86.0, 'yds_per_rec' => 6.2],
+                ['type' => 'slant',    'share' => 0.15, 'base_rate' => 73.0, 'yds_per_rec' => 8.8],
+                ['type' => 'out',      'share' => 0.12, 'base_rate' => 68.0, 'yds_per_rec' => 8.5],
+                ['type' => 'post',     'share' => 0.08, 'base_rate' => 60.0, 'yds_per_rec' => 16.0],
+                ['type' => 'corner',   'share' => 0.05, 'base_rate' => 52.0, 'yds_per_rec' => 14.5],
+                ['type' => 'go',       'share' => 0.02, 'base_rate' => 45.0, 'yds_per_rec' => 20.0],
+                ['type' => 'comeback', 'share' => 0.02, 'base_rate' => 64.0, 'yds_per_rec' => 10.5],
+            ];
+            $totalBaseTargets = max(25, (int) round($statAvg * 0.85));
+        } else {
+            $routeTemplates = [
+                ['type' => 'flat',     'share' => 0.38, 'base_rate' => 86.0, 'yds_per_rec' => 6.8],
+                ['type' => 'slant',    'share' => 0.20, 'base_rate' => 78.0, 'yds_per_rec' => 7.5],
+                ['type' => 'curl',     'share' => 0.16, 'base_rate' => 80.0, 'yds_per_rec' => 6.2],
+                ['type' => 'out',      'share' => 0.14, 'base_rate' => 72.0, 'yds_per_rec' => 7.0],
+                ['type' => 'dig',      'share' => 0.08, 'base_rate' => 68.0, 'yds_per_rec' => 8.5],
+                ['type' => 'go',       'share' => 0.04, 'base_rate' => 50.0, 'yds_per_rec' => 15.0],
+            ];
+            $totalBaseTargets = max(20, (int) round($statAvg * 0.50));
+        }
+
+        $generated = [];
+        $rIdx = 1;
+        foreach ($routeTemplates as $tmpl) {
+            $targets = max(2, (int) round($totalBaseTargets * $tmpl['share']));
+            $jitter = (($playerId * 7 + $rIdx * 13) % 11) - 5;
+            $catchRate = round(max(40.0, min(95.0, $tmpl['base_rate'] + $jitter)), 2);
+            $receptions = max(1, (int) round($targets * ($catchRate / 100.0)));
+            $yards = max(5, (int) round($receptions * $tmpl['yds_per_rec']));
+
+            $generated[] = [
+                'route_id'     => ($playerId * 10) + $rIdx,
+                'route_type'   => $tmpl['type'],
+                'targets'      => $targets,
+                'receptions'   => $receptions,
+                'yards_gained' => $yards,
+                'catch_rate'   => $catchRate,
+            ];
+            $rIdx++;
+        }
+
+        return $generated;
     }
 }

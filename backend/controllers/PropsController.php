@@ -33,7 +33,7 @@ class PropsController
     {
         try {
             $sport = isset($_GET['sport']) && is_string($_GET['sport']) ? trim($_GET['sport']) : null;
-            $limit = isset($_GET['limit']) ? max(1, min(100, (int) $_GET['limit'])) : 50;
+            $limit = isset($_GET['limit']) ? max(1, min(500, (int) $_GET['limit'])) : 300;
 
             $props = $this->propModel->getAll($sport, $limit);
 
@@ -101,6 +101,16 @@ class PropsController
     private function enrichProp(array $prop, int $index = 0): array
     {
         $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
+        // Prefer dynamic average from ESPN game logs if present
+        $playerId = (int) ($prop["player_id"] ?? 0);
+        $betType = $prop["bet_type"] ?? "";
+        if ($playerId > 0 && !empty($betType)) {
+            $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+            if (!empty($dbLogs)) {
+                $vals = array_map(fn($log) => (float) $log["stat_value"], $dbLogs);
+                $playerAvg = round(array_sum($vals) / count($vals), 2);
+            }
+        }
         $line = (float) ($prop['line_over'] ?? 0.0);
         $odds = (float) ($prop['odds_over'] ?? 1.90);
         $opposingRank = (int) ($prop['opposing_defensive_rank'] ?? 16);
@@ -227,9 +237,18 @@ class PropsController
                 ];
             }
         } else {
-            // Realistic deterministic fallback based on stat_average & line
-            // Guarantees frontend StatsDrawer.jsx works even before ESPN ingestion
-            $simulatedOpponents = ['vs LAC', '@ DEN', 'vs LV', '@ SF', 'vs BAL'];
+            // Dynamic deterministic fallback based on player ID, team & stat average
+            // Guarantees frontend StatsDrawer.jsx displays realistic distinct opponents if DB logs are missing
+            $teamPool = ['GB', 'CHI', 'MIN', 'DET', 'LAR', 'SF', 'DAL', 'PHI', 'KC', 'BUF', 'BAL', 'MIA', 'NYJ', 'CIN', 'PIT', 'SEA', 'TB', 'ATL', 'HOU', 'IND'];
+            $playerTeam = $prop['team_abbreviation'] ?? 'NFL';
+            $filteredPool = array_values(array_filter($teamPool, fn($t) => $t !== $playerTeam));
+            $poolCount = max(1, count($filteredPool));
+            $simulatedOpponents = [];
+            for ($i = 0; $i < 5; $i++) {
+                $oppIdx = ($playerId * 3 + $i * 2 + 1) % $poolCount;
+                $prefix = ($i % 2 === 0) ? 'vs ' : '@ ';
+                $simulatedOpponents[] = $prefix . $filteredPool[$oppIdx];
+            }
             $multipliers = [1.06, 0.94, 1.12, 0.98, 1.04];
 
             foreach ($simulatedOpponents as $i => $opp) {
