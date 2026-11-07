@@ -15,6 +15,7 @@ class CorsMiddleware
         'http://localhost:3000', // Alternative React port
         'http://127.0.0.1:5173',
         'http://127.0.0.1:3000',
+        'https://matchupiq-isc.vercel.app',
         'https://matchupiq-theta.vercel.app'
     ];
 
@@ -32,8 +33,11 @@ class CorsMiddleware
             // Direct script access or same-origin
             header("Access-Control-Allow-Origin: *");
         } else {
-            // For development flexibility, allow localhost on any port
-            if (preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin)) {
+            // Allow localhost on any port or any MatchupIQ Vercel deployment/preview
+            if (
+                preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin) ||
+                preg_match('/^https:\/\/matchupiq[a-z0-9-]*\.vercel\.app$/', $origin)
+            ) {
                 header("Access-Control-Allow-Origin: {$origin}");
             }
         }
@@ -50,4 +54,3 @@ class CorsMiddleware
         }
     }
 }
-
