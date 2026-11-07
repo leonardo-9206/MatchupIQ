@@ -52,16 +52,14 @@ class Database
                     break;
                 }
             }
-            if (!isset($options[PDO::MYSQL_ATTR_SSL_CA])) {
-                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-            }
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
         }
 
         try {
             $this->connection = new PDO($dsn, $user, $password, $options);
         } catch (PDOException $e) {
             error_log('Database Connection Error: ' . $e->getMessage());
-            throw new Exception('Database connection failed. Please check server configuration.');
+            throw new Exception('Database connection failed: ' . $e->getMessage());
         }
     }
 
