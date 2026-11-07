@@ -38,6 +38,25 @@ class Database
             PDO::ATTR_EMULATE_PREPARES   => false,
         ];
 
+        // SSL support for TiDB Cloud Serverless or cloud databases
+        $sslRequired = getenv('DB_SSL') === 'true' || getenv('TIDB_HOST') || (int)$port === 4000;
+        if ($sslRequired) {
+            $caPaths = [
+                '/etc/ssl/certs/ca-certificates.crt', // Debian / Ubuntu (Render Docker runtime)
+                '/etc/pki/tls/certs/ca-bundle.crt',   // RedHat / CentOS / Alpine
+                '/etc/ssl/cert.pem'                    // macOS / OpenSSL standard
+            ];
+            foreach ($caPaths as $ca) {
+                if (file_exists($ca)) {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+                    break;
+                }
+            }
+            if (!isset($options[PDO::MYSQL_ATTR_SSL_CA])) {
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            }
+        }
+
         try {
             $this->connection = new PDO($dsn, $user, $password, $options);
         } catch (PDOException $e) {
