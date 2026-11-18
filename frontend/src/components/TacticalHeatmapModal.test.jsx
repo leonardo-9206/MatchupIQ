@@ -52,12 +52,12 @@ describe('TacticalHeatmapModal', () => {
     expect(screen.getByText('coverage of 3')).toBeInTheDocument();
   });
 
-  it('hides the rushing heatmap for a TE and opens the route tree', () => {
+  it('shows route tree, receiving zones and coverage views for a TE', () => {
     openFor(2);
 
-    expect(tabs()).toEqual(['Route Tree', 'Man vs Zone']);
-    expect(screen.getByRole('tab', { name: 'Route Tree' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByTestId('position-scope-badge')).toHaveTextContent('TE: Passing & Coverage Maps');
+    expect(tabs()).toEqual(['Route Tree', 'Receiving Zones', 'Man vs Zone']);
+    expect(screen.getByRole('tab', { name: 'Receiving Zones' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('position-scope-badge')).toHaveTextContent('TE: Route Tree & Receiving Zones');
   });
 
   it('keeps a newly synced WR selected instead of falling back to another player', () => {
@@ -65,9 +65,9 @@ describe('TacticalHeatmapModal', () => {
 
     expect(screen.getByLabelText('Atleta Seleccionado')).toHaveValue('31');
     expect(screen.getByRole('option', { name: 'A.J. Brown (NE · WR)' }).selected).toBe(true);
-    expect(tabs()).toEqual(['Route Tree', 'Man vs Zone']);
-    expect(screen.getByText('routes of 31')).toBeInTheDocument();
-    expect(screen.getByTestId('position-scope-badge')).toHaveTextContent('WR: Passing & Coverage Maps');
+    expect(tabs()).toEqual(['Route Tree', 'Receiving Zones', 'Man vs Zone']);
+    expect(screen.getByText('heatmap of 31')).toBeInTheDocument();
+    expect(screen.getByTestId('position-scope-badge')).toHaveTextContent('WR: Route Tree & Receiving Zones');
   });
 
   it('only offers the rushing heatmap for a QB', () => {
@@ -83,13 +83,13 @@ describe('TacticalHeatmapModal', () => {
     expect(screen.getByText('No hay mapas tácticos para la posición ST.')).toBeInTheDocument();
   });
 
-  it('switches tabs when the user changes from a RB to a WR', () => {
+  it('updates available tabs when the user changes from a RB to a WR', () => {
     openFor(3);
 
     fireEvent.change(screen.getByLabelText('Atleta Seleccionado'), { target: { value: '31' } });
 
-    expect(tabs()).toEqual(['Route Tree', 'Man vs Zone']);
-    expect(screen.getByRole('tab', { name: 'Route Tree' })).toHaveAttribute('aria-selected', 'true');
+    expect(tabs()).toEqual(['Route Tree', 'Receiving Zones', 'Man vs Zone']);
+    expect(screen.getByRole('tab', { name: 'Receiving Zones' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('follows the athlete of the card that opened it', () => {
