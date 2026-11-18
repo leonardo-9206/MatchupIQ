@@ -1,13 +1,13 @@
 <?php
 /**
  * MatchupIQ — Backend Automated Integration Test Suite
- * Evaluates Sprint 1, Sprint 2 & Sprint 3 Backend requirements:
+ * Evaluates Sprint 1, Sprint 2, Sprint 3 & Sprint 4 Backend requirements:
  * 1. Health & CORS Infrastructure
  * 2. Access Restrictions & RBAC (401 Unauthorized, 403 Forbidden)
  * 3. Server-side Input Validation (400 Bad Request, 422 Unprocessable)
  * 4. Secure Authentication Flow (Register 201, Login 200, Duplicate 409, Logout 200)
  * 5. Persistent Props Data Flow & Value Edge Calculation
- * 6. NFL Tactical Analytics (Heatmaps, Coverage Splits & Route Trees)
+ * 6. NFL Tactical Analytics (Heatmaps, WR/TE Receiving Zones, Coverage Splits & Route Trees)
  * 7. Bet Tracker Full CRUD & OWASP BOLA Access Control
  * 8. Protected Admin Endpoints & Quota Shielding
  *
@@ -313,6 +313,9 @@ class TestRunner
         $missingPlayerRoutes = $this->request('GET', '/api/tactics/routes.php');
         $this->assert("GET /api/tactics/routes.php without player_id returns 400 Bad Request", $missingPlayerRoutes['code'] === 400);
 
+        $invalidMethodRoutes = $this->request('POST', '/api/tactics/routes.php');
+        $this->assert("POST /api/tactics/routes.php is blocked with 405 Method Not Allowed", $invalidMethodRoutes['code'] === 405);
+
         $heatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=3');
         if ($heatmap['code'] === 500 && str_contains(json_encode($heatmap), 'Database connection failed')) {
             $this->skip("Tactical heatmap, coverage & route tree persistence tests skipped: MySQL database is not currently running.");
@@ -323,18 +326,25 @@ class TestRunner
             $this->assert("Heatmap response includes summary metrics and dominant_zone", 
                 isset($heatmap['json']['data']['summary']['dominant_zone'], $heatmap['json']['data']['summary']['overall_success_rate']));
 
+            // WR Receiving Zones Heatmap verification (Ja'Marr Chase, player_id = 16)
+            $wrHeatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=16');
+            $this->assert("GET /api/tactics/heatmap.php?player_id=16 (WR Ja'Marr Chase) returns 200 OK", $wrHeatmap['code'] === 200);
+            $wrZones = $wrHeatmap['json']['data']['zones'] ?? [];
+            $this->assert("WR Receiving Zones response contains all 5 aerial field zones", is_array($wrZones) && count($wrZones) === 5);
+
             $notFoundHeatmap = $this->request('GET', '/api/tactics/heatmap.php?player_id=999999');
             $this->assert("GET /api/tactics/heatmap.php?player_id=999999 returns 404 Not Found", $notFoundHeatmap['code'] === 404);
 
-            $coverage = $this->request('GET', '/api/tactics/coverage.php?player_id=2&zone_rate=70');
-            $this->assert("GET /api/tactics/coverage.php?player_id=2&zone_rate=70 returns 200 OK", $coverage['code'] === 200);
+            $coverage = $this->request('GET', '/api/tactics/coverage.php?player_id=2&opponent_zone_rate=80');
+            $this->assert("GET /api/tactics/coverage.php?player_id=2&opponent_zone_rate=80 returns 200 OK", $coverage['code'] === 200);
             $splits = $coverage['json']['data']['splits'] ?? [];
             $schemes = is_array($splits) ? array_column($splits, 'coverage_type') : [];
             $this->assert("Coverage response contains both 'man' and 'zone' splits", 
                 in_array('man', $schemes, true) && in_array('zone', $schemes, true));
             $covSummary = $coverage['json']['data']['summary'] ?? [];
-            $this->assert("Coverage summary projects FAVORABLE advantage and tactical_edge_boost for Kelce vs 70% Zone", 
+            $this->assert("Coverage summary computes projected_catch_rate, tactical_advantage and tactical_edge_boost for opponent_zone_rate=80", 
                 ($covSummary['tactical_advantage'] ?? '') === 'FAVORABLE'
+                && (float) ($covSummary['opponent_zone_rate'] ?? 0) === 80.0
                 && isset($covSummary['projected_catch_rate'], $covSummary['tactical_edge_boost']));
 
             $notFoundCoverage = $this->request('GET', '/api/tactics/coverage.php?player_id=999999');
@@ -343,8 +353,13 @@ class TestRunner
             $routes = $this->request('GET', '/api/tactics/routes.php?player_id=2');
             $this->assert("GET /api/tactics/routes.php?player_id=2 returns 200 OK", $routes['code'] === 200);
             $routeList = $routes['json']['data']['routes'] ?? [];
-            $this->assert("Route tree response contains NextGenStats routes array and summary", 
-                is_array($routeList) && count($routeList) > 0 && isset($routes['json']['data']['summary']['primary_route']));
+            $routeSummary = $routes['json']['data']['summary'] ?? [];
+            $this->assert("Route tree response contains 'routes' array, 'primary_route' and 'overall_catch_rate' in summary", 
+                is_array($routeList) && count($routeList) > 0
+                && isset($routeSummary['primary_route'], $routeSummary['overall_catch_rate']));
+
+            $notFoundRoutes = $this->request('GET', '/api/tactics/routes.php?player_id=999999');
+            $this->assert("GET /api/tactics/routes.php?player_id=999999 returns 404 Not Found", $notFoundRoutes['code'] === 404);
         }
 
         // ==========================================

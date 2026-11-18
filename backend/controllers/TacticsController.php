@@ -2,7 +2,7 @@
 /**
  * TacticsController
  * Handles request validation and orchestrates NFL tactical analytics endpoints
- * for rushing zone heatmaps, defensive coverage splits (Man vs Zone), and receiver route trees.
+ * for rushing/receiving zone heatmaps, defensive coverage splits (Man vs Zone), and receiver route trees.
  */
 
 require_once __DIR__ . '/../models/Heatmap.php';
@@ -20,7 +20,7 @@ class TacticsController
     }
 
     /**
-     * Returns the 5-zone rushing heatmap breakdown for a given NFL player.
+     * Returns the 5-zone tactical heatmap breakdown (rushing lanes for RB/QB, receiving zones for WR/TE).
      * GET /api/tactics/heatmap.php?player_id=3
      */
     public function heatmap(): void
@@ -40,11 +40,11 @@ class TacticsController
             }
 
             $zones = $heatmapModel->getZonesByPlayerId($playerId);
-            if (empty($zones)) {
+            $breakdown = $this->heatmapEngine->buildHeatmapBreakdown($player, $zones);
+
+            if (empty($breakdown['zones'])) {
                 Response::error('No tactical heatmap data found for the specified player.', 404);
             }
-
-            $breakdown = $this->heatmapEngine->buildHeatmapBreakdown($player, $zones);
 
             Response::success('Player heatmap data retrieved successfully.', $breakdown, 200);
         } catch (Throwable $e) {
@@ -55,7 +55,8 @@ class TacticsController
 
     /**
      * Returns the Man vs Zone coverage performance breakdown and matchup projection for a given NFL player.
-     * GET /api/tactics/coverage.php?player_id=2&zone_rate=70
+     * Supports optional `opponent_zone_rate` or `zone_rate` parameter (0-100, default 70.0).
+     * GET /api/tactics/coverage.php?player_id=2&opponent_zone_rate=80
      */
     public function coverage(): void
     {
@@ -66,13 +67,14 @@ class TacticsController
         }
 
         $opponentZoneRate = 70.0;
-        if (isset($_GET['zone_rate']) && $_GET['zone_rate'] !== '') {
-            if (!is_numeric($_GET['zone_rate'])) {
-                Response::error('Parameter "zone_rate" must be a numeric percentage between 0 and 100.', 400);
+        $rawZoneRate = $_GET['opponent_zone_rate'] ?? $_GET['zone_rate'] ?? null;
+        if ($rawZoneRate !== null && $rawZoneRate !== '') {
+            if (!is_numeric($rawZoneRate)) {
+                Response::error('Parameter "opponent_zone_rate" must be a numeric percentage between 0 and 100.', 400);
             }
-            $parsedZoneRate = (float) $_GET['zone_rate'];
+            $parsedZoneRate = (float) $rawZoneRate;
             if ($parsedZoneRate < 0.0 || $parsedZoneRate > 100.0) {
-                Response::error('Parameter "zone_rate" must be between 0 and 100.', 400);
+                Response::error('Parameter "opponent_zone_rate" must be between 0 and 100.', 400);
             }
             $opponentZoneRate = $parsedZoneRate;
         }
@@ -87,11 +89,11 @@ class TacticsController
             }
 
             $splits = $coverageModel->getSplitsByPlayerId($playerId);
-            if (empty($splits)) {
+            $breakdown = $this->heatmapEngine->buildCoverageBreakdown($player, $splits, $opponentZoneRate);
+
+            if (empty($breakdown['splits'])) {
                 Response::error('No coverage split data found for the specified player.', 404);
             }
-
-            $breakdown = $this->heatmapEngine->buildCoverageBreakdown($player, $splits, $opponentZoneRate);
 
             Response::success('Player coverage splits retrieved successfully.', $breakdown, 200);
         } catch (Throwable $e) {

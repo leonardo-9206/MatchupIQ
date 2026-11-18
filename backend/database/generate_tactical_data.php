@@ -8,7 +8,9 @@
  *
  * Description:
  * Generates empirical NextGenStats / NFLverse tactical distributions:
- * 1. `player_heatmaps`: 5 directional rushing lanes (left_end, left_tackle, middle, right_tackle, right_end)
+ * 1. `player_heatmaps`:
+ *    - RB & QB: 5 directional rushing lanes (left_end, left_tackle, middle, right_tackle, right_end)
+ *    - WR & TE: 5 aerial receiving zones across the field with realistic 65%-85% success rates
  * 2. `coverage_splits`: Performance against Man vs Zone defensive coverage schemes
  */
 
@@ -48,13 +50,31 @@ try {
     $deleteCoverage = $db->prepare("DELETE FROM coverage_splits WHERE player_id = :id");
     $insertCoverage = $db->prepare("INSERT INTO coverage_splits (player_id, coverage_type, targets, receptions, catch_rate) VALUES (:pid, :type, :targets, :rec, :rate)");
 
-    // NFL NextGenStats empirical zone distributions
-    $zonesConfig = [
+    // NFL NextGenStats empirical rushing lane distributions (RB & QB)
+    $rushingZonesConfig = [
         'left_end'     => ['att_pct' => 0.12, 'yds_pct' => 0.14, 'rate' => 58.50],
         'left_tackle'  => ['att_pct' => 0.22, 'yds_pct' => 0.23, 'rate' => 63.20],
         'middle'       => ['att_pct' => 0.35, 'yds_pct' => 0.31, 'rate' => 54.80],
         'right_tackle' => ['att_pct' => 0.20, 'yds_pct' => 0.21, 'rate' => 61.40],
         'right_end'    => ['att_pct' => 0.11, 'yds_pct' => 0.11, 'rate' => 52.00],
+    ];
+
+    // NFL NextGenStats aerial receiving zone distributions for Wide Receivers (65% - 85% success rate)
+    $wrReceivingZonesConfig = [
+        'left_end'     => ['att_pct' => 0.22, 'yds_pct' => 0.24, 'rate' => 69.50],
+        'left_tackle'  => ['att_pct' => 0.18, 'yds_pct' => 0.19, 'rate' => 74.80],
+        'middle'       => ['att_pct' => 0.20, 'yds_pct' => 0.16, 'rate' => 79.60],
+        'right_tackle' => ['att_pct' => 0.19, 'yds_pct' => 0.19, 'rate' => 76.20],
+        'right_end'    => ['att_pct' => 0.21, 'yds_pct' => 0.22, 'rate' => 71.40],
+    ];
+
+    // NFL NextGenStats aerial receiving zone distributions for Tight Ends (65% - 85% success rate)
+    $teReceivingZonesConfig = [
+        'left_end'     => ['att_pct' => 0.11, 'yds_pct' => 0.10, 'rate' => 68.20],
+        'left_tackle'  => ['att_pct' => 0.24, 'yds_pct' => 0.25, 'rate' => 77.40],
+        'middle'       => ['att_pct' => 0.32, 'yds_pct' => 0.31, 'rate' => 82.50],
+        'right_tackle' => ['att_pct' => 0.22, 'yds_pct' => 0.23, 'rate' => 75.80],
+        'right_end'    => ['att_pct' => 0.11, 'yds_pct' => 0.11, 'rate' => 67.90],
     ];
 
     // Coverage schemes: 36% Man, 64% Zone
@@ -68,14 +88,14 @@ try {
 
     foreach ($players as $p) {
         $pid = (int) $p['player_id'];
-        $pos = $p['position'];
+        $pos = strtoupper((string) $p['position']);
         $avg = (float) $p['stat_average'];
         if ($avg <= 0) {
             $avg = ($pos === 'QB' ? 245.0 : ($pos === 'RB' ? 65.0 : ($pos === 'WR' ? 60.0 : 45.0)));
         }
 
-        // 1. Heatmaps for RBs and rushing QBs
-        if (in_array($pos, ['RB', 'QB'], true)) {
+        // 1. Heatmaps for RBs/QBs (rushing lanes) and WRs/TEs (receiving zones)
+        if (in_array($pos, ['RB', 'QB', 'WR', 'TE'], true)) {
             $checkHeatmap->execute([':id' => $pid]);
             $hasHeatmap = (int)$checkHeatmap->fetchColumn() > 0;
 
@@ -83,19 +103,41 @@ try {
                 if ($force) {
                     $deleteHeatmap->execute([':id' => $pid]);
                 }
-                $seasonYards = round($avg * 12);
-                $seasonAttempts = max(10, round($seasonYards / ($pos === 'QB' ? 5.2 : 4.4)));
 
-                foreach ($zonesConfig as $zone => $cfg) {
+                $seasonYards = round($avg * 12);
+
+                if (in_array($pos, ['WR', 'TE'], true)) {
+                    $activeZonesConfig = ($pos === 'TE') ? $teReceivingZonesConfig : $wrReceivingZonesConfig;
+                    $yardsPerTarget = ($pos === 'TE') ? 7.8 : 8.8;
+                    $seasonAttempts = max(12, round($seasonYards / $yardsPerTarget));
+                } else {
+                    $activeZonesConfig = $rushingZonesConfig;
+                    $yardsPerCarry = ($pos === 'QB') ? 5.2 : 4.4;
+                    $seasonAttempts = max(10, round($seasonYards / $yardsPerCarry));
+                }
+
+                $zoneIdx = 1;
+                foreach ($activeZonesConfig as $zone => $cfg) {
                     $att = max(1, (int) round($seasonAttempts * $cfg['att_pct']));
                     $yds = max(1, (int) round($seasonYards * $cfg['yds_pct']));
+
+                    // Deterministic athlete variation while keeping WR/TE strictly in 65%-85% range
+                    $jitter = ((($pid * 5) + ($zoneIdx * 9)) % 7) - 3; // [-3, +3]
+                    $rate = round($cfg['rate'] + ($jitter * 0.65), 2);
+                    if (in_array($pos, ['WR', 'TE'], true)) {
+                        $rate = max(65.00, min(85.00, $rate));
+                    } else {
+                        $rate = max(48.00, min(75.00, $rate));
+                    }
+
                     $insertHeatmap->execute([
                         ':pid'   => $pid,
                         ':zone'  => $zone,
                         ':att'   => $att,
                         ':yds'   => $yds,
-                        ':rate'  => $cfg['rate']
+                        ':rate'  => $rate
                     ]);
+                    $zoneIdx++;
                 }
                 $heatmapsCreated++;
             }
