@@ -123,6 +123,8 @@ CREATE TABLE `props` (
     `odds_under` DECIMAL(6,2) NOT NULL,
     `calculated_edge` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_props_edge_updated` (`calculated_edge` DESC, `updated_at` DESC),
+    INDEX `idx_props_game_player` (`game_id`, `player_id`),
     CONSTRAINT `fk_props_player` FOREIGN KEY (`player_id`)
         REFERENCES `players` (`player_id`)
         ON UPDATE CASCADE
@@ -146,6 +148,7 @@ CREATE TABLE `bet_tracker` (
     `status` ENUM('pending', 'won', 'lost', 'void') NOT NULL DEFAULT 'pending',
     `notes` TEXT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_tracker_user_date` (`user_id`, `created_at` DESC),
     CONSTRAINT `fk_bet_tracker_user` FOREIGN KEY (`user_id`)
         REFERENCES `users` (`user_id`)
         ON UPDATE CASCADE
@@ -167,6 +170,7 @@ CREATE TABLE `player_heatmaps` (
     `attempts` INT NOT NULL DEFAULT 0,
     `yards_gained` INT NOT NULL DEFAULT 0,
     `success_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    INDEX `idx_heatmaps_player_zone` (`player_id`, `field_zone`),
     CONSTRAINT `fk_heatmaps_player` FOREIGN KEY (`player_id`)
         REFERENCES `players` (`player_id`)
         ON UPDATE CASCADE
@@ -180,6 +184,7 @@ CREATE TABLE `coverage_splits` (
     `targets` INT NOT NULL DEFAULT 0,
     `receptions` INT NOT NULL DEFAULT 0,
     `catch_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    INDEX `idx_coverage_player_type` (`player_id`, `coverage_type`),
     CONSTRAINT `fk_coverage_player` FOREIGN KEY (`player_id`)
         REFERENCES `players` (`player_id`)
         ON UPDATE CASCADE

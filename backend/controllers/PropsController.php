@@ -37,11 +37,15 @@ class PropsController
 
             $props = $this->propModel->getAll($sport, $limit);
 
+            // Pre-fetch game logs for all distinct players in batch to prevent N+1 query latency
+            $playerIds = array_column($props, 'player_id');
+            $batchLogs = !empty($playerIds) ? $this->gameLogModel->getRecentLogsBatch($playerIds, 5) : [];
+
             // Enrich props with Edge recommendation badges & recent 5-game performance
             $enrichedProps = [];
             $featuredPlayerIds = [];
             foreach ($props as $i => $prop) {
-                $enriched = $this->enrichProp($prop, $i);
+                $enriched = $this->enrichProp($prop, $i, $batchLogs);
                 // Feature the top 3 distinct players with the highest Edge
                 if (count($featuredPlayerIds) < 3 && !in_array($enriched['player_id'], $featuredPlayerIds) && (float) ($enriched['calculated_edge'] ?? 0) > 0) {
                     $enriched['is_featured'] = true;
@@ -98,14 +102,21 @@ class PropsController
      * Enriches a raw prop record with Edge calculations, display labels, American odds,
      * recent 5-game trends, and featured placement flag.
      */
-    private function enrichProp(array $prop, int $index = 0): array
+    private function enrichProp(array $prop, int $index = 0, ?array $batchLogs = null): array
     {
         $playerAvg = (float) ($prop['stat_average'] ?? 0.0);
         // Prefer dynamic average from ESPN game logs if present
         $playerId = (int) ($prop["player_id"] ?? 0);
         $betType = $prop["bet_type"] ?? "";
+
+        $dbLogs = [];
         if ($playerId > 0 && !empty($betType)) {
-            $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+            if ($batchLogs !== null) {
+                $dbLogs = $batchLogs[$playerId][$betType] ?? [];
+            } else {
+                $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+            }
+
             if (!empty($dbLogs)) {
                 $vals = array_map(fn($log) => (float) $log["stat_value"], $dbLogs);
                 $playerAvg = round(array_sum($vals) / count($vals), 2);
@@ -161,7 +172,7 @@ class PropsController
         $prop['best_bookmaker'] = $prop['best_bookmaker'] ?? 'DraftKings';
 
         // Enrich with recent 5 games trend and streak hits (for StatsDrawer.jsx)
-        $recentTrends = $this->buildRecentGamesTrend($prop);
+        $recentTrends = $this->buildRecentGamesTrend($prop, $dbLogs);
         $prop['recent_games'] = $recentTrends['recent_games'];
         $prop['streak_hits'] = $recentTrends['streak_hits'];
 
@@ -201,20 +212,23 @@ class PropsController
 
     /**
      * Helper to construct the 5-game recent trend and hit rate.
-     * Queries player_game_logs from DB. If empty or table not yet migrated, provides
+     * Uses provided $dbLogs or queries player_game_logs from DB. If empty or table not yet migrated, provides
      * a mathematically consistent fallback based on player's stat average so frontend never breaks.
      *
      * @param array $prop
+     * @param array|null $dbLogs Pre-queried game logs to avoid redundant database calls
      * @return array [ 'recent_games' => [...], 'streak_hits' => 'X/5' ]
      */
-    private function buildRecentGamesTrend(array $prop): array
+    private function buildRecentGamesTrend(array $prop, ?array $dbLogs = null): array
     {
         $playerId = (int) ($prop['player_id'] ?? 0);
         $betType = (string) ($prop['bet_type'] ?? 'passing_yards');
         $line = (float) ($prop['line_over'] ?? 0.0);
         $avg = (float) ($prop['stat_average'] ?? 0.0);
 
-        $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+        if ($dbLogs === null) {
+            $dbLogs = $this->gameLogModel->getRecentLogsByPlayerAndStat($playerId, $betType, 5);
+        }
 
         $recentGames = [];
         $hits = 0;
