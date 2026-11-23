@@ -62,13 +62,20 @@ export default function FieldHeatmap({ playerId = null, data = null, metric = 's
 
   const stats = useMemo(() => buildZoneStats(rows), [rows]);
 
+  // Colors only depend on the data and the metric, not on which lane is hovered,
+  // so they are computed once per data/metric change instead of on every mouse move
+  const scale = useMemo(() => {
+    const values = ZONES.map((z) => stats[z.key]?.[metric] ?? 0);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return { min, max, colors: values.map((v) => heatColor(normalize(v, min, max))) };
+  }, [stats, metric]);
+
   if (rows.length === 0) {
     return <TacticsPlaceholder loading={loading} />;
   }
 
-  const values = ZONES.map((z) => stats[z.key]?.[metric] ?? 0);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const { min, max, colors } = scale;
   const totalAttempts = ZONES.reduce((sum, z) => sum + (stats[z.key]?.attempts ?? 0), 0);
   const active = activeZone ? stats[activeZone] : null;
 
@@ -80,8 +87,8 @@ export default function FieldHeatmap({ playerId = null, data = null, metric = 's
             {/* One fading gradient per lane: solid at the line of scrimmage (bottom), transparent downfield (top) */}
             {ZONES.map((zone, i) => (
               <linearGradient key={zone.key} id={`lane-${zone.key}`} x1="0" x2="0" y1="1" y2="0">
-                <stop offset="0%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0.9" />
-                <stop offset="100%" stopColor={heatColor(normalize(values[i], min, max))} stopOpacity="0" />
+                <stop offset="0%" stopColor={colors[i]} stopOpacity="0.9" />
+                <stop offset="100%" stopColor={colors[i]} stopOpacity="0" />
               </linearGradient>
             ))}
           </defs>

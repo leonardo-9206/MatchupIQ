@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 // Static drawing of an American football field in vertical orientation:
 // the offense's own end zone is at the bottom and it attacks upward, like the view from behind the QB.
 // Scale: 10 SVG units = 1 yard. Full field = 120 yd long (incl. end zones) x 53.3 yd wide.
@@ -10,56 +12,58 @@ export const LINE_OF_SCRIMMAGE_YARD = 10 + 25;
 
 // Hash marks in the NFL sit 70'9" from each sideline (~23.58 yd).
 const HASH_OFFSET = 23.58 * YARD;
+// Extra yards drawn above/below the window so rotated numbers aren't cut at the edges
+const CULL_MARGIN_YARDS = 2;
 
 // "Absolute" yards go from 0 (back of the offense's end zone) to 120 (back of the opponent's end zone).
 // In SVG, y grows downward, so we flip it to put yard 0 at the bottom.
 export const yardToY = (absYard) => FIELD_LENGTH - absYard * YARD;
 
 /**
- * Draws the whole field but only shows the window between fromYard and toYard (absolute yards),
- * and between fromX and toX (yards from the left sideline), so the parent can zoom into the play.
+ * Lines, hash marks and numbers of the field.
+ *
+ * Performance notes (Sprint 4):
+ * - Only the marks inside the visible window are created. The tactical views show ~40-50 yards,
+ *   so drawing all 120 yards used to create ~4x more SVG nodes than needed.
+ * - It is wrapped in memo() and only receives numbers, so hovering a lane or a route (which re-renders
+ *   the heatmap) no longer re-renders the hundreds of static marks.
  */
-export default function FootballField({ fromYard = 0, toYard = 120, fromX = 0, toX = FIELD_WIDTH / YARD, children }) {
-  const yardLines = [];
-  for (let yd = 5; yd <= 95; yd += 5) {
-    yardLines.push(yardToY(10 + yd));
-  }
+export const FieldMarkings = memo(function FieldMarkings({ fromYard, toYard }) {
+  // Field yards (0-100 between goal lines) that fall inside the visible window
+  const firstYard = Math.max(1, Math.ceil(fromYard - 10 - CULL_MARGIN_YARDS));
+  const lastYard = Math.min(99, Math.floor(toYard - 10 + CULL_MARGIN_YARDS));
+  const isVisible = (absYard) => absYard >= fromYard - CULL_MARGIN_YARDS && absYard <= toYard + CULL_MARGIN_YARDS;
 
+  const yardLines = [];
   const hashMarks = [];
-  for (let yd = 1; yd < 100; yd++) {
-    if (yd % 5 === 0) continue;
-    hashMarks.push(yardToY(10 + yd));
+  for (let yd = firstYard; yd <= lastYard; yd++) {
+    (yd % 5 === 0 ? yardLines : hashMarks).push(yardToY(10 + yd));
   }
 
   // Numbers 10, 20, 30, 40, 50, 40, ... 10, read from the sidelines
-  const numbers = [10, 20, 30, 40, 50, 60, 70, 80, 90].map((yd) => ({
-    y: yardToY(10 + yd),
-    label: yd <= 50 ? yd : 100 - yd,
-  }));
-
-  const viewTop = yardToY(toYard);
-  const viewHeight = (toYard - fromYard) * YARD;
+  const numbers = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    .filter((yd) => isVisible(10 + yd))
+    .map((yd) => ({ y: yardToY(10 + yd), label: yd <= 50 ? yd : 100 - yd }));
 
   return (
-    <svg
-      viewBox={`${fromX * YARD} ${viewTop} ${(toX - fromX) * YARD} ${viewHeight}`}
-      className="h-auto w-full rounded-xl"
-      role="img"
-      aria-label="Football field heatmap"
-    >
+    <g data-testid="field-markings">
       {/* Turf */}
       <rect width={FIELD_WIDTH} height={FIELD_LENGTH} fill="#0B3D2E" />
       {/* End zones (opponent's at the top, offense's at the bottom) */}
-      <rect width={FIELD_WIDTH} height={END_ZONE} fill="#0E1626" />
-      <rect y={FIELD_LENGTH - END_ZONE} width={FIELD_WIDTH} height={END_ZONE} fill="#0E1626" />
+      {isVisible(110) && <rect width={FIELD_WIDTH} height={END_ZONE} fill="#0E1626" />}
+      {isVisible(10) && <rect y={FIELD_LENGTH - END_ZONE} width={FIELD_WIDTH} height={END_ZONE} fill="#0E1626" />}
 
       {/* Yard lines every 5 yards */}
       {yardLines.map((y) => (
         <line key={y} x1={0} y1={y} x2={FIELD_WIDTH} y2={y} stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
       ))}
       {/* Goal lines */}
-      <line x1={0} y1={END_ZONE} x2={FIELD_WIDTH} y2={END_ZONE} stroke="#ffffff" strokeOpacity="0.8" strokeWidth="4" />
-      <line x1={0} y1={FIELD_LENGTH - END_ZONE} x2={FIELD_WIDTH} y2={FIELD_LENGTH - END_ZONE} stroke="#ffffff" strokeOpacity="0.8" strokeWidth="4" />
+      {isVisible(110) && (
+        <line x1={0} y1={END_ZONE} x2={FIELD_WIDTH} y2={END_ZONE} stroke="#ffffff" strokeOpacity="0.8" strokeWidth="4" />
+      )}
+      {isVisible(10) && (
+        <line x1={0} y1={FIELD_LENGTH - END_ZONE} x2={FIELD_WIDTH} y2={FIELD_LENGTH - END_ZONE} stroke="#ffffff" strokeOpacity="0.8" strokeWidth="4" />
+      )}
 
       {/* Hash marks (sidelines + inbounds) */}
       {hashMarks.map((y) => (
@@ -78,6 +82,26 @@ export default function FootballField({ fromYard = 0, toYard = 120, fromX = 0, t
           <text x={FIELD_WIDTH - 50} y={y} dominantBaseline="middle" transform={`rotate(-90 ${FIELD_WIDTH - 50} ${y})`}>{label}</text>
         </g>
       ))}
+    </g>
+  );
+});
+
+/**
+ * Draws the field but only shows the window between fromYard and toYard (absolute yards),
+ * and between fromX and toX (yards from the left sideline), so the parent can zoom into the play.
+ */
+export default function FootballField({ fromYard = 0, toYard = 120, fromX = 0, toX = FIELD_WIDTH / YARD, children }) {
+  const viewTop = yardToY(toYard);
+  const viewHeight = (toYard - fromYard) * YARD;
+
+  return (
+    <svg
+      viewBox={`${fromX * YARD} ${viewTop} ${(toX - fromX) * YARD} ${viewHeight}`}
+      className="h-auto w-full rounded-xl"
+      role="img"
+      aria-label="Football field heatmap"
+    >
+      <FieldMarkings fromYard={fromYard} toYard={toYard} />
 
       {/* Heat layers and markers are drawn on top of the static field */}
       {children}
