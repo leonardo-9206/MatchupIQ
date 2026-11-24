@@ -82,6 +82,12 @@ class TestRunner
         $invalidEspnMethod = $this->request('GET', '/api/admin/espn/sync.php');
         $this->assert("GET /api/admin/espn/sync.php is blocked with 405 Method Not Allowed", $invalidEspnMethod['code'] === 405);
 
+        $unauthStats = $this->request('GET', '/api/admin/stats.php');
+        $this->assert("GET /api/admin/stats.php without session is rejected with 401 Unauthorized", $unauthStats['code'] === 401);
+
+        $invalidStatsMethod = $this->request('POST', '/api/admin/stats.php');
+        $this->assert("POST /api/admin/stats.php is blocked with 405 Method Not Allowed", $invalidStatsMethod['code'] === 405);
+
         // ==========================================
         // Suite 3: Input Validation & Sanitization
         // ==========================================
@@ -165,6 +171,10 @@ class TestRunner
             $userEspnForbidden = $this->request('POST', '/api/admin/espn/sync.php', null, true);
             $this->assert("RBAC: Regular authenticated user accessing /api/admin/espn/sync.php is blocked with 403 Forbidden", 
                 $userEspnForbidden['code'] === 403);
+
+            $userStatsForbidden = $this->request('GET', '/api/admin/stats.php', null, true);
+            $this->assert("RBAC: Regular authenticated user accessing /api/admin/stats.php is blocked with 403 Forbidden", 
+                $userStatsForbidden['code'] === 403);
 
             // Logout
             $logout = $this->request('POST', '/api/auth/logout.php', null, true);
@@ -415,6 +425,12 @@ class TestRunner
                 ], true);
 
                 if ($loginU2['code'] === 200) {
+                    // Verify Admin Stats endpoint returns 200 OK and database telemetry
+                    $adminStats = $this->request('GET', '/api/admin/stats.php', null, true);
+                    $this->assert("GET /api/admin/stats.php with admin session returns 200 OK", $adminStats['code'] === 200);
+                    $this->assert("Admin stats payload contains database table counts and ping_ms", 
+                        isset($adminStats['json']['data']['counts']['players'], $adminStats['json']['data']['ping_ms']));
+
                     // Try to delete User 1's bet as User 2 (should be blocked by BOLA)
                     $bolaDelete = $this->request('POST', '/api/tracker/delete.php', [
                         'bet_id' => $createdBetId
