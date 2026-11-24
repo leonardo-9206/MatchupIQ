@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Layers, BookmarkCheck, LogIn, LogOut } from 'lucide-react';
+import { Activity, Layers, BookmarkCheck, LogIn, LogOut, Settings } from 'lucide-react';
 import Button from './common/Button.jsx';
 
 export default function Navbar({
@@ -11,6 +11,8 @@ export default function Navbar({
   onLogout,
   trackerBetsCount = 0,
 }) {
+  const isAdmin = currentUser?.role === 'admin';
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070B16]/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -75,6 +77,19 @@ export default function Navbar({
               </span>
             )}
           </Button>
+
+          {/* Admin Panel Tab (Sprint 4 - Visible to Admin) */}
+          {isAdmin && (
+            <Button
+              variant={activeTab === 'admin' ? 'primary' : 'ghost'}
+              size="sm"
+              icon={Settings}
+              onClick={() => onSelectTab('admin')}
+              className="border border-brand-cyan/30 text-brand-cyan"
+            >
+              <span>Admin Panel</span>
+            </Button>
+          )}
         </nav>
 
         {/* Authentication State Section */}
@@ -92,7 +107,7 @@ export default function Navbar({
                 </div>
                 <div className="hidden sm:block text-left leading-tight">
                   <span className="block font-semibold text-slate-200">{currentUser.full_name || currentUser.email}</span>
-                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role_name || currentUser.role || 'Usuario'}</span>
+                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role || 'Usuario'}</span>
                 </div>
               </div>
 
@@ -132,4 +147,3 @@ export default function Navbar({
     </header>
   );
 }
-

@@ -250,14 +250,14 @@ export async function getProps(sport = null) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s resilient timeout for cloud database
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for snappy UI
 
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
-      if (data && ((data.success || data.status === 'success') && Array.isArray(data.data?.props)) && data.data.props.length > 0) {
+      if (data && data.success && Array.isArray(data.data?.props) && data.data.props.length > 0) {
         return {
           source: 'backend',
           props: data.data.props,
@@ -278,4 +278,3 @@ export async function getProps(sport = null) {
     props: filtered,
   };
 }
-
