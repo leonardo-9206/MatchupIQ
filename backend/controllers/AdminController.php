@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../services/OddsApiService.php';
 require_once __DIR__ . '/../services/EspnApiService.php';
 require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
+require_once __DIR__ . '/../config/Database.php';
 require_once __DIR__ . '/../config/Response.php';
 
 class AdminController
@@ -115,6 +116,73 @@ class AdminController
         } catch (Throwable $e) {
             error_log('AdminController ESPN Sync Error: ' . $e->getMessage());
             Response::error('Internal server error during ESPN synchronization: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Retrieves database health metrics, table row counts, and sync status for the admin panel.
+     * Route: GET /api/admin/stats.php
+     * Access: Administrator role only
+     */
+    public function getDatabaseStats(): void
+    {
+        // 1. RBAC Guard: Verify session and require 'admin' role
+        $adminUser = AuthMiddleware::requireRole('admin');
+
+        $startTime = microtime(true);
+
+        try {
+            $db = Database::getInstance()->getConnection();
+
+            // Measure database ping latency
+            $pingStart = microtime(true);
+            $db->query("SELECT 1")->fetchColumn();
+            $pingMs = round((microtime(true) - $pingStart) * 1000, 2);
+
+            // Fetch table counts
+            $counts = [
+                'users'            => (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn(),
+                'players'          => (int) $db->query("SELECT COUNT(*) FROM players")->fetchColumn(),
+                'teams'            => (int) $db->query("SELECT COUNT(*) FROM teams")->fetchColumn(),
+                'games'            => (int) $db->query("SELECT COUNT(*) FROM games")->fetchColumn(),
+                'props'            => (int) $db->query("SELECT COUNT(*) FROM props")->fetchColumn(),
+                'bet_tracker'      => (int) $db->query("SELECT COUNT(*) FROM bet_tracker")->fetchColumn(),
+                'player_game_logs' => (int) $db->query("SELECT COUNT(*) FROM player_game_logs")->fetchColumn(),
+                'player_heatmaps'  => (int) $db->query("SELECT COUNT(*) FROM player_heatmaps")->fetchColumn(),
+                'coverage_splits'  => (int) $db->query("SELECT COUNT(*) FROM coverage_splits")->fetchColumn(),
+            ];
+
+            // Cache & Sync indicators
+            $latestCacheStmt = $db->query("SELECT fetched_at, expires_at FROM odds_cache ORDER BY fetched_at DESC LIMIT 1");
+            $latestCache = $latestCacheStmt->fetch(PDO::FETCH_ASSOC);
+
+            $latestLogStmt = $db->query("SELECT MAX(game_date) AS latest_game FROM player_game_logs");
+            $latestLog = $latestLogStmt->fetch(PDO::FETCH_ASSOC);
+
+            $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+
+            Response::success('Database statistics and infrastructure metrics retrieved successfully.', [
+                'requested_by' => $adminUser['email'],
+                'ping_ms'      => $pingMs,
+                'benchmark_ms' => $executionTimeMs,
+                'counts'       => $counts,
+                'odds_cache'   => [
+                    'active'     => !empty($latestCache),
+                    'fetched_at' => $latestCache['fetched_at'] ?? null,
+                    'expires_at' => $latestCache['expires_at'] ?? null,
+                ],
+                'espn_sync'    => [
+                    'latest_game_date' => $latestLog['latest_game'] ?? null,
+                ],
+                'database'     => [
+                    'engine' => 'MySQL / TiDB Cloud',
+                    'status' => 'connected',
+                ]
+            ], 200);
+
+        } catch (Throwable $e) {
+            error_log('AdminController Database Stats Error: ' . $e->getMessage());
+            Response::error('Failed to retrieve database metrics: ' . $e->getMessage(), 500);
         }
     }
 }
