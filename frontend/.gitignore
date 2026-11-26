@@ -1,0 +1,3 @@
+# Playwright E2E output (screenshots, traces and HTML report of failed runs)
+test-results/
+playwright-report/
