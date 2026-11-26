@@ -46,13 +46,27 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
             </div>
 
             {/* Edge Pill */}
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+            <div
+              className={`mt-3 flex items-center justify-between rounded-xl border p-3 ${
+                prop.calculated_edge >= 0
+                  ? 'border-emerald-500/30 bg-emerald-500/10'
+                  : 'border-rose-500/30 bg-rose-500/10'
+              }`}
+            >
               <div>
-                <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider block">
-                  Valor Matemático Esperado
+                <span
+                  className={`text-[11px] font-mono uppercase tracking-wider block ${
+                    prop.calculated_edge >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {prop.calculated_edge >= 0 ? 'Valor Matemático Esperado' : 'Desventaja Estadística Esperada'}
                 </span>
-                <span className="font-mono text-xl font-black text-edge-positive">
-                  +{prop.calculated_edge}% EDGE (+EV)
+                <span
+                  className={`font-mono text-xl font-black ${
+                    prop.calculated_edge >= 0 ? 'text-edge-positive' : 'text-rose-400'
+                  }`}
+                >
+                  {prop.calculated_edge > 0 ? `+${prop.calculated_edge}%` : `${prop.calculated_edge}%`} EDGE {prop.calculated_edge >= 0 ? '(+EV)' : '(-EV)'}
                 </span>
               </div>
               <div className="text-right">
@@ -180,15 +194,30 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
             </div>
 
             {/* 3. Matchup Context & Defense Ranking */}
-            <div className="rounded-xl border border-slate-800 bg-[#0D1527] p-4 text-xs space-y-2">
-              <div className="flex items-center gap-2 text-slate-200 font-bold font-display">
-                <Shield className="h-4 w-4 text-sky-400" />
-                <span>Contexto Defensivo del Rival</span>
-              </div>
-              <p className="text-slate-300 leading-relaxed text-[11px]">
-                {prop.opponent_abbreviation} se ubica como la defensa <strong className="text-white">#{prop.opponent_rank}</strong> de la liga permitiendo yardas en esta categoría. Este enfrentamiento otorga una ventaja estadística favorable para el pick sugerido.
-              </p>
-            </div>
+            {(() => {
+              const rank = Number(prop.opponent_rank || prop.opposing_defensive_rank || 16);
+              const rival = prop.opponent_abbreviation || prop.opponent_name || 'El rival';
+              const isTough = rank <= 10;
+              const isFavorable = rank >= 20;
+
+              return (
+                <div className="rounded-xl border border-slate-800 bg-[#0D1527] p-4 text-xs space-y-2">
+                  <div className="flex items-center gap-2 text-slate-200 font-bold font-display">
+                    <Shield className="h-4 w-4 text-sky-400" />
+                    <span>Contexto Defensivo del Rival</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    {rival} se ubica como la defensa <strong className="text-white">#{rank}</strong> de la liga permitiendo yardas en esta categoría {isTough ? '(unidad élite conteniendo el avance)' : isFavorable ? '(unidad permisiva que concede alto yardaje)' : '(rendimiento de media tabla)'}. {
+                      prop.calculated_edge >= 0
+                        ? (isTough
+                            ? 'A pesar del emparejamiento defensivo exigente, el volumen histórico del jugador supera la línea del mercado (+EV).'
+                            : 'Este emparejamiento favorable potencia el valor matemático esperado (+EV) para el pick.')
+                        : 'El enfrentamiento proyecta una desventaja estadística frente a la línea evaluada (-EV).'
+                    }
+                  </p>
+                </div>
+              );
+            })()}
 
           </div>
 
@@ -213,3 +242,5 @@ export default function StatsDrawer({ prop, isOpen, onClose, onOpenHeatmap, onAd
     </div>
   );
 }
+
+

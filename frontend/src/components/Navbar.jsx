@@ -11,7 +11,7 @@ export default function Navbar({
   onLogout,
   trackerBetsCount = 0,
 }) {
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role_name === 'admin';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070B16]/95 backdrop-blur-md">
@@ -107,7 +107,7 @@ export default function Navbar({
                 </div>
                 <div className="hidden sm:block text-left leading-tight">
                   <span className="block font-semibold text-slate-200">{currentUser.full_name || currentUser.email}</span>
-                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role || 'Usuario'}</span>
+                  <span className="block text-[10px] text-brand-cyan uppercase font-mono">{currentUser.role_name || currentUser.role || 'Usuario'}</span>
                 </div>
               </div>
 
