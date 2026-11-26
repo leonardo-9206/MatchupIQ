@@ -7,7 +7,10 @@
 
 require_once __DIR__ . '/../services/OddsApiService.php';
 require_once __DIR__ . '/../services/EspnApiService.php';
+require_once __DIR__ . '/../models/Team.php';
+require_once __DIR__ . '/../models/Player.php';
 require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
+require_once __DIR__ . '/../middlewares/Validator.php';
 require_once __DIR__ . '/../config/Database.php';
 require_once __DIR__ . '/../config/Response.php';
 
@@ -15,11 +18,15 @@ class AdminController
 {
     private OddsApiService $oddsService;
     private EspnApiService $espnService;
+    private Team $teamModel;
+    private Player $playerModel;
 
     public function __construct()
     {
         $this->oddsService = new OddsApiService();
         $this->espnService = new EspnApiService();
+        $this->teamModel = new Team();
+        $this->playerModel = new Player();
     }
 
     /**
@@ -184,5 +191,295 @@ class AdminController
             error_log('AdminController Database Stats Error: ' . $e->getMessage());
             Response::error('Failed to retrieve database metrics: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Lists all teams in the catalog.
+     * Route: GET /api/admin/teams/index.php
+     */
+    public function listTeams(): void
+    {
+        AuthMiddleware::requireRole('admin');
+
+        try {
+            $teams = $this->teamModel->getAll();
+            Response::success('Teams retrieved successfully.', [
+                'total' => count($teams),
+                'teams' => $teams
+            ], 200);
+        } catch (Throwable $e) {
+            error_log('AdminController List Teams Error: ' . $e->getMessage());
+            Response::error('Failed to retrieve teams catalog.', 500);
+        }
+    }
+
+    /**
+     * Creates a new team in the catalog.
+     * Route: POST /api/admin/teams/create.php
+     */
+    public function createTeam(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $input = $this->getJsonBody();
+
+        $validator = Validator::make($input, [
+            'sport_id'       => 'required|integer|min:1',
+            'name'           => 'required|min:2|max:100',
+            'abbreviation'   => 'required|min:2|max:10',
+            'defensive_rank' => 'required|integer|min:1|max:32',
+        ]);
+
+        if ($validator->fails()) {
+            Response::error('Validation failed for team creation.', 422, $validator->errors());
+        }
+
+        $data = $validator->validated();
+        $sportId = (int) $data['sport_id'];
+
+        try {
+            if (!$this->teamModel->sportExists($sportId)) {
+                Response::error('The specified sport_id does not exist.', 422, ['sport_id' => ['Invalid sport_id.']]);
+            }
+
+            $team = $this->teamModel->create(
+                $sportId,
+                (string) $data['name'],
+                (string) $data['abbreviation'],
+                (int) $data['defensive_rank']
+            );
+
+            Response::success('Team created successfully.', ['team' => $team], 201);
+        } catch (Throwable $e) {
+            error_log('AdminController Create Team Error: ' . $e->getMessage());
+            Response::error('Failed to create team.', 500);
+        }
+    }
+
+    /**
+     * Updates an existing team in the catalog.
+     * Route: PUT /api/admin/teams/update.php
+     */
+    public function updateTeam(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $input = $this->getJsonBody();
+
+        $validator = Validator::make($input, [
+            'team_id'        => 'required|integer|min:1',
+            'sport_id'       => 'integer|min:1',
+            'name'           => 'min:2|max:100',
+            'abbreviation'   => 'min:2|max:10',
+            'defensive_rank' => 'integer|min:1|max:32',
+        ]);
+
+        if ($validator->fails()) {
+            Response::error('Validation failed for team update.', 422, $validator->errors());
+        }
+
+        $data = $validator->validated();
+        $teamId = (int) $data['team_id'];
+
+        try {
+            if (isset($data['sport_id']) && !$this->teamModel->sportExists((int) $data['sport_id'])) {
+                Response::error('The specified sport_id does not exist.', 422, ['sport_id' => ['Invalid sport_id.']]);
+            }
+
+            $updated = $this->teamModel->update($teamId, $data);
+            if (!$updated) {
+                Response::error('Team not found.', 404);
+            }
+
+            Response::success('Team updated successfully.', ['team' => $updated], 200);
+        } catch (Throwable $e) {
+            error_log('AdminController Update Team Error: ' . $e->getMessage());
+            Response::error('Failed to update team.', 500);
+        }
+    }
+
+    /**
+     * Deletes a team from the catalog.
+     * Route: DELETE /api/admin/teams/delete.php?id=1
+     */
+    public function deleteTeam(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $teamId = $this->resolveIdParam('team_id');
+
+        if ($teamId === null) {
+            Response::error('A valid integer "id" parameter is required.', 400);
+        }
+
+        try {
+            $deleted = $this->teamModel->delete($teamId);
+            if (!$deleted) {
+                Response::error('Team not found.', 404);
+            }
+
+            Response::success('Team deleted successfully.', ['team_id' => $teamId], 200);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') {
+                Response::error('Cannot delete team because it has associated players or games.', 409);
+            }
+            error_log('AdminController Delete Team PDO Error: ' . $e->getMessage());
+            Response::error('Failed to delete team.', 500);
+        } catch (Throwable $e) {
+            error_log('AdminController Delete Team Error: ' . $e->getMessage());
+            Response::error('Failed to delete team.', 500);
+        }
+    }
+
+    /**
+     * Lists all players in the catalog.
+     * Route: GET /api/admin/players/index.php
+     */
+    public function listPlayers(): void
+    {
+        AuthMiddleware::requireRole('admin');
+
+        try {
+            $players = $this->playerModel->getAll();
+            Response::success('Players retrieved successfully.', [
+                'total'   => count($players),
+                'players' => $players
+            ], 200);
+        } catch (Throwable $e) {
+            error_log('AdminController List Players Error: ' . $e->getMessage());
+            Response::error('Failed to retrieve players catalog.', 500);
+        }
+    }
+
+    /**
+     * Creates a new player in the catalog.
+     * Route: POST /api/admin/players/create.php
+     */
+    public function createPlayer(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $input = $this->getJsonBody();
+
+        $validator = Validator::make($input, [
+            'team_id'      => 'required|integer|min:1',
+            'name'         => 'required|min:2|max:100',
+            'position'     => 'required|min:1|max:20',
+            'stat_average' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            Response::error('Validation failed for player creation.', 422, $validator->errors());
+        }
+
+        $data = $validator->validated();
+        $teamId = (int) $data['team_id'];
+
+        try {
+            if (!$this->playerModel->teamExists($teamId)) {
+                Response::error('The specified team_id does not exist.', 422, ['team_id' => ['Invalid team_id.']]);
+            }
+
+            $player = $this->playerModel->create(
+                $teamId,
+                (string) $data['name'],
+                (string) $data['position'],
+                (float) $data['stat_average']
+            );
+
+            Response::success('Player created successfully.', ['player' => $player], 201);
+        } catch (Throwable $e) {
+            error_log('AdminController Create Player Error: ' . $e->getMessage());
+            Response::error('Failed to create player.', 500);
+        }
+    }
+
+    /**
+     * Updates an existing player in the catalog.
+     * Route: PUT /api/admin/players/update.php
+     */
+    public function updatePlayer(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $input = $this->getJsonBody();
+
+        $validator = Validator::make($input, [
+            'player_id'    => 'required|integer|min:1',
+            'team_id'      => 'integer|min:1',
+            'name'         => 'min:2|max:100',
+            'position'     => 'min:1|max:20',
+            'stat_average' => 'numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            Response::error('Validation failed for player update.', 422, $validator->errors());
+        }
+
+        $data = $validator->validated();
+        $playerId = (int) $data['player_id'];
+
+        try {
+            if (isset($data['team_id']) && !$this->playerModel->teamExists((int) $data['team_id'])) {
+                Response::error('The specified team_id does not exist.', 422, ['team_id' => ['Invalid team_id.']]);
+            }
+
+            $updated = $this->playerModel->update($playerId, $data);
+            if (!$updated) {
+                Response::error('Player not found.', 404);
+            }
+
+            Response::success('Player updated successfully.', ['player' => $updated], 200);
+        } catch (Throwable $e) {
+            error_log('AdminController Update Player Error: ' . $e->getMessage());
+            Response::error('Failed to update player.', 500);
+        }
+    }
+
+    /**
+     * Deletes a player from the catalog.
+     * Route: DELETE /api/admin/players/delete.php?id=1
+     */
+    public function deletePlayer(): void
+    {
+        AuthMiddleware::requireRole('admin');
+        $playerId = $this->resolveIdParam('player_id');
+
+        if ($playerId === null) {
+            Response::error('A valid integer "id" parameter is required.', 400);
+        }
+
+        try {
+            $deleted = $this->playerModel->delete($playerId);
+            if (!$deleted) {
+                Response::error('Player not found.', 404);
+            }
+
+            Response::success('Player deleted successfully.', ['player_id' => $playerId], 200);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') {
+                Response::error('Cannot delete player because they have associated props or records.', 409);
+            }
+            error_log('AdminController Delete Player PDO Error: ' . $e->getMessage());
+            Response::error('Failed to delete player.', 500);
+        } catch (Throwable $e) {
+            error_log('AdminController Delete Player Error: ' . $e->getMessage());
+            Response::error('Failed to delete player.', 500);
+        }
+    }
+
+    private function getJsonBody(): array
+    {
+        $raw = file_get_contents('php://input');
+        $decoded = json_decode($raw ?: '', true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+        return is_array($_POST) ? $_POST : [];
+    }
+
+    private function resolveIdParam(string $bodyKey): ?int
+    {
+        $id = isset($_GET['id']) ? filter_var($_GET['id'], FILTER_VALIDATE_INT) : false;
+        if (!$id) {
+            $input = $this->getJsonBody();
+            $id = isset($input[$bodyKey]) ? filter_var($input[$bodyKey], FILTER_VALIDATE_INT) : false;
+        }
+        return ($id && $id > 0) ? (int) $id : null;
     }
 }

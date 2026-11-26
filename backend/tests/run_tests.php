@@ -88,6 +88,18 @@ class TestRunner
         $invalidStatsMethod = $this->request('POST', '/api/admin/stats.php');
         $this->assert("POST /api/admin/stats.php is blocked with 405 Method Not Allowed", $invalidStatsMethod['code'] === 405);
 
+        $unauthTeams = $this->request('GET', '/api/admin/teams/index.php');
+        $this->assert("GET /api/admin/teams/index.php without session is rejected with 401 Unauthorized", $unauthTeams['code'] === 401);
+
+        $invalidTeamsMethod = $this->request('POST', '/api/admin/teams/index.php');
+        $this->assert("POST /api/admin/teams/index.php is blocked with 405 Method Not Allowed", $invalidTeamsMethod['code'] === 405);
+
+        $unauthPlayers = $this->request('GET', '/api/admin/players/index.php');
+        $this->assert("GET /api/admin/players/index.php without session is rejected with 401 Unauthorized", $unauthPlayers['code'] === 401);
+
+        $invalidPlayersMethod = $this->request('POST', '/api/admin/players/index.php');
+        $this->assert("POST /api/admin/players/index.php is blocked with 405 Method Not Allowed", $invalidPlayersMethod['code'] === 405);
+
         // ==========================================
         // Suite 3: Input Validation & Sanitization
         // ==========================================
@@ -175,6 +187,14 @@ class TestRunner
             $userStatsForbidden = $this->request('GET', '/api/admin/stats.php', null, true);
             $this->assert("RBAC: Regular authenticated user accessing /api/admin/stats.php is blocked with 403 Forbidden", 
                 $userStatsForbidden['code'] === 403);
+
+            $userTeamsForbidden = $this->request('GET', '/api/admin/teams/index.php', null, true);
+            $this->assert("RBAC: Regular authenticated user accessing /api/admin/teams/index.php is blocked with 403 Forbidden", 
+                $userTeamsForbidden['code'] === 403);
+
+            $userPlayersForbidden = $this->request('GET', '/api/admin/players/index.php', null, true);
+            $this->assert("RBAC: Regular authenticated user accessing /api/admin/players/index.php is blocked with 403 Forbidden", 
+                $userPlayersForbidden['code'] === 403);
 
             // Logout
             $logout = $this->request('POST', '/api/auth/logout.php', null, true);
@@ -451,6 +471,91 @@ class TestRunner
                     $this->assert("Legitimate owner deleting their own bet returns 200 OK", $legitDelete['code'] === 200);
                 }
             }
+        }
+
+        // ==========================================
+        // Suite 8: Admin Catalogs CRUD (Teams & Players)
+        // ==========================================
+        $this->section("Suite 8: Admin Catalogs CRUD (Teams & Players)");
+
+        $this->request('POST', '/api/auth/logout.php', null, true);
+        $adminLogin = $this->request('POST', '/api/auth/login.php', [
+            'email'    => 'admin@matchupiq.com',
+            'password' => 'Password123!'
+        ], true);
+
+        if ($adminLogin['code'] === 200) {
+            // 1. Teams List & Validation
+            $teamsList = $this->request('GET', '/api/admin/teams/index.php', null, true);
+            $this->assert("GET /api/admin/teams/index.php returns 200 OK for admin", $teamsList['code'] === 200);
+            $this->assert("Teams catalog payload contains 'teams' array", is_array($teamsList['json']['data']['teams'] ?? null));
+
+            $badTeam = $this->request('POST', '/api/admin/teams/create.php', [
+                'sport_id'       => 1,
+                'name'           => 'A',
+                'abbreviation'   => 'X',
+                'defensive_rank' => 99
+            ], true);
+            $this->assert("POST /api/admin/teams/create.php with invalid fields returns 422 Unprocessable", $badTeam['code'] === 422);
+
+            // 2. Create & Update Team
+            $createTeam = $this->request('POST', '/api/admin/teams/create.php', [
+                'sport_id'       => 1,
+                'name'           => 'Integration Test Franchise',
+                'abbreviation'   => 'ITF',
+                'defensive_rank' => 14
+            ], true);
+            $this->assert("POST /api/admin/teams/create.php creates team with 201 Created", $createTeam['code'] === 201);
+            $createdTeamId = $createTeam['json']['data']['team']['team_id'] ?? null;
+            $this->assert("Created team returns valid team_id", $createdTeamId !== null);
+
+            if ($createdTeamId) {
+                $updateTeam = $this->request('PUT', '/api/admin/teams/update.php', [
+                    'team_id'        => $createdTeamId,
+                    'defensive_rank' => 9
+                ], true);
+                $this->assert("PUT /api/admin/teams/update.php updates team with 200 OK", $updateTeam['code'] === 200);
+                $this->assert("Updated team reflects defensive_rank = 9",
+                    (int) ($updateTeam['json']['data']['team']['defensive_rank'] ?? 0) === 9);
+
+                // 3. Players List, Create & Update
+                $playersList = $this->request('GET', '/api/admin/players/index.php', null, true);
+                $this->assert("GET /api/admin/players/index.php returns 200 OK for admin", $playersList['code'] === 200);
+                $this->assert("Players catalog payload contains 'players' array", is_array($playersList['json']['data']['players'] ?? null));
+
+                $createPlayer = $this->request('POST', '/api/admin/players/create.php', [
+                    'team_id'      => $createdTeamId,
+                    'name'         => 'Integration Test Athlete',
+                    'position'     => 'WR',
+                    'stat_average' => 74.5
+                ], true);
+                $this->assert("POST /api/admin/players/create.php creates player with 201 Created", $createPlayer['code'] === 201);
+                $createdPlayerId = $createPlayer['json']['data']['player']['player_id'] ?? null;
+                $this->assert("Created player returns valid player_id", $createdPlayerId !== null);
+
+                if ($createdPlayerId) {
+                    $updatePlayer = $this->request('PUT', '/api/admin/players/update.php', [
+                        'player_id'    => $createdPlayerId,
+                        'stat_average' => 81.25
+                    ], true);
+                    $this->assert("PUT /api/admin/players/update.php updates player with 200 OK", $updatePlayer['code'] === 200);
+                    $this->assert("Updated player reflects stat_average = 81.25",
+                        (float) ($updatePlayer['json']['data']['player']['stat_average'] ?? 0) === 81.25);
+
+                    // 4. FK integrity check: deleting team while player exists returns 409 Conflict
+                    $fkConflict = $this->request('DELETE', "/api/admin/teams/delete.php?id={$createdTeamId}", null, true);
+                    $this->assert("DELETE /api/admin/teams/delete.php with linked player returns 409 Conflict", $fkConflict['code'] === 409);
+
+                    // 5. Clean teardown: delete player then team
+                    $deletePlayer = $this->request('DELETE', "/api/admin/players/delete.php?id={$createdPlayerId}", null, true);
+                    $this->assert("DELETE /api/admin/players/delete.php removes player with 200 OK", $deletePlayer['code'] === 200);
+                }
+
+                $deleteTeam = $this->request('DELETE', "/api/admin/teams/delete.php?id={$createdTeamId}", null, true);
+                $this->assert("DELETE /api/admin/teams/delete.php removes team with 200 OK", $deleteTeam['code'] === 200);
+            }
+
+            $this->request('POST', '/api/auth/logout.php', null, true);
         }
 
         // ==========================================
