@@ -8,6 +8,7 @@ import TacticalHeatmapModal from './components/TacticalHeatmapModal.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import BetTrackerView from './components/BetTrackerView.jsx';
 import AddBetModal from './components/AddBetModal.jsx';
+import AdminPanelView from './components/admin/AdminPanelView.jsx';
 import { getProps } from './services/propsService.js';
 import { checkSession, logoutUser } from './services/authService.js';
 import { getBets, createBet, updateBet, deleteBet } from './services/trackerService.js';
@@ -24,7 +25,7 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
   const [heatmapPlayerId, setHeatmapPlayerId] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'catalog' | 'tracker'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'catalog' | 'tracker' | 'admin'
 
   // Admin sync states
   const [isRefreshingOdds, setIsRefreshingOdds] = useState(false);
@@ -139,6 +140,9 @@ export default function App() {
   const handleLogout = async () => {
     await logoutUser();
     setCurrentUser(null);
+    if (activeTab === 'admin') {
+      setActiveTab('dashboard');
+    }
   };
 
   // Bet Tracker Handlers (Sprint 3)
@@ -190,8 +194,12 @@ export default function App() {
           trackerBetsCount={bets.filter((b) => b.status === 'pending').length}
         />
 
-        {/* View Switcher: Bet Tracker View vs Main Dashboard */}
-        {activeTab === 'tracker' ? (
+        {/* View Switcher: Admin Panel vs Bet Tracker vs Main Dashboard */}
+        {activeTab === 'admin' ? (
+          <main>
+            <AdminPanelView currentUser={currentUser} />
+          </main>
+        ) : activeTab === 'tracker' ? (
           <main>
             <BetTrackerView
               bets={bets}
